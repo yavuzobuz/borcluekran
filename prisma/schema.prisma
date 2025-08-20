@@ -1,0 +1,45 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model BorcluBilgileri {
+  id                Int      @id @default(autoincrement())
+  durumTanitici     String   @unique @map("durum_tanitici")
+  isim              String?
+  borcTutari        Float?   @map("borc_tutari")
+  telefon           String?
+  adres             String?
+  notlar            String?
+  ilgiliTCKN        String?  @map("ilgili_tckn")
+  avukatAtamaTarihi String?  @map("avukat_atama_tarihi")
+  muhatapTanimi     String?  @map("muhatap_tanimi")
+  kayitTarihi       DateTime @default(now()) @map("kayit_tarihi")
+  guncellemeTarihi  DateTime @updatedAt @map("guncelleme_tarihi")
+  
+  // İlişki
+  odemeSozleri      OdemeSozu[]
+  
+  @@map("borclu_bilgileri")
+}
+
+model OdemeSozu {
+  id                Int      @id @default(autoincrement())
+  durumTanitici     String   @map("durum_tanitici")
+  sozTarihi         DateTime @map("soz_tarihi")
+  sozTutari         Float    @map("soz_tutari")
+  aciklama          String?
+  olusturmaTarihi   DateTime @default(now()) @map("olusturma_tarihi")
+  
+  // İlişki
+  borclu            BorcluBilgileri @relation(fields: [durumTanitici], references: [durumTanitici])
+  
+  @@map("odeme_sozleri")
+}
