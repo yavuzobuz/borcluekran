@@ -9,56 +9,55 @@ import { Search, FileText, Calendar, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 
 interface Borclu {
-  // Kullanıcının verdiği tam sıralamaya göre düzenlenmiş alanlar
-  ilgiliTCKN: string                    // İlgili TCKN
-  avukatAtamaTarihi?: string            // Avukat Atama Tarihi
-  durumTanitici: string                 // Durum tanıtıcısı
-  muhatapTanimi: string                 // Muhatap tanımı
-  durumTanimi: string                   // Durum Tanımı
-  sozlesmeHesabi: string                // Sözleşme hesabı
-  tcKimlikNo: string                    // TC kimlik no
-  vergiNo?: string                      // Vergi No
-  icraDosyaNumarasi?: string           // İcra Dosya Numarası
-  icraDairesiTanimi?: string           // İcra Dairesi Tanımı
-  adresBilgileri?: string              // Adres Bilgileri
-  il?: string                          // İl
-  ilce?: string                        // İlçe
-  telefon1?: string                    // Telefon (1. sıradaki)
-  telefon2?: string                    // Telefon (2. sıradaki)
-  aboneGrubu?: string                  // Abone Grubu
-  asilAlacak?: number                  // Asıl Alacak
-  takipCikisMiktari?: number           // Takip Çıkış Miktarı
-  takipOncesiTahsilat?: number         // Takip Öncesi Tahsilat
-  takipSonrasiTahsilat?: number        // Takip Sonrası Tahsilat
-  toplamAcikTutar?: number             // Toplam Açık tutar
-  guncelBorc?: number                  // Güncel Borç
-  itirazDurumu?: string                // İtiraz Durumu
-  borcluTipiTanimi?: string            // Borçlu Tipi Tanımı
-  hitamTarihi?: string                 // Hitam Tarihi
-  takipTarihi?: string                 // Takip Tarihi
-  nedenTanimi?: string                 // Neden Tanımı
-  durumTuru?: string                   // Durum Türü
-  durumTuruTanimi?: string             // Durum Türü Tanımı
-  tesisatDurumu?: string               // Tesisat Durumu
-  odemeDurumu?: string                 // Ödeme Durumu
-  vekaletUcreti?: number               // Vekalet Ücreti
-  neden?: string                       // Neden
-  muhatapTanimi2?: string              // Muhatap tanımı (2. sıradaki)
-  muhatapTanimi3?: string              // Muhatap Tanımı (3. sıradaki)
-  uyapDurumu?: string                  // Uyap Durumu
-  telefon3?: string                    // Telefon (3. sıradaki)
-  tesisat?: string                     // Tesisat
-  tesisatDurumuTanimi?: string         // Tesisat Durumu Tanımı
+  // Prisma schema'ya uygun field'lar
+  id: number
+  ilgiliTCKN?: string
+  avukatAtamaTarihi?: string
+  durum?: string
+  durumTanitici: string
+  muhatapTanimi?: string
+  durumTanimi?: string
+  sozlesmeHesabi?: string
+  tcKimlikNo?: string
+  vergiNo?: string
+  icraDosyaNumarasi?: string
+  icraDairesiTanimi?: string
+  adresBilgileri?: string
+  il?: string
+  ilce?: string
+  telefon?: string
+  telefonAboneGrubu?: string
+  asilAlacak?: number
+  takipCikisMiktari?: number
+  takipOncesiTahsilat?: number
+  takipSonrasiTahsilat?: number
+  toplamAcikTutar?: number
+  guncelBorc?: number
+  itirazDurumu?: string
+  borcluTipiTanimi?: string
+  hitamTarihi?: string
+  takipTarihi?: string
+  nedenTanimi?: string
+  durumTuru?: string
+  durumTuruTanimi?: string
+  tesisatDurumu?: string
+  odemeDurumu?: string
+  vekaletUcreti?: number
+  neden?: string
+  muhatapTanimiEk?: string
+  uyapDurumu?: string
+  telefonTesisat?: string
+  tesisatDurumuTanimi?: string
+  kayitTarihi?: string
+  guncellemeTarihi?: string
   
   // Eski alanlar (geriye uyumluluk için)
-  id?: string
   isim?: string
   ad?: string
   soyad?: string
   tcKimlik?: string
   borcMiktari?: number
   sonOdemeTarihi?: string
-  durum?: string
   vadeTarihi?: string
 }
 
@@ -95,7 +94,7 @@ export default function BorclularPage() {
 
   const fetchBorclular = async () => {
     try {
-      const response = await fetch('/api/search?q=')
+      const response = await fetch('/api/search?q=&limit=1000')
       if (response.ok) {
         const data = await response.json()
         setBorclular(data.results || [])
@@ -231,59 +230,59 @@ export default function BorclularPage() {
           </Card>
         ) : (
           filteredBorclular.map((borclu) => (
-            <Card key={borclu.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-4 mb-2">
-                      <h3 className="text-lg font-semibold">
-                        {borclu.muhatapTanimi || `${borclu.ad || ''} ${borclu.soyad || ''}`.trim()}
-                      </h3>
-                      {getDurumBadge(borclu)}
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-muted-foreground">
-                      <div>
-                        <span className="font-medium">İlgili TCKN:</span> {borclu.ilgiliTCKN}
-                      </div>
-                      <div>
-                        <span className="font-medium">Durum Tanıtıcı:</span> {borclu.durumTanitici}
-                      </div>
-                      <div>
-                        <span className="font-medium">Güncel Borç:</span> {(borclu.guncelBorc || borclu.borcMiktari || 0).toLocaleString('tr-TR')} ₺
-                      </div>
-                      <div>
-                        <span className="font-medium">TC Kimlik No:</span> {borclu.tcKimlikNo || borclu.tcKimlik}
-                      </div>
-                    </div>
-                    {(borclu.icraDosyaNumarasi || borclu.il || borclu.telefon1) && (
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground mt-2">
-                        {borclu.icraDosyaNumarasi && (
-                          <div>
-                            <span className="font-medium">İcra Dosya No:</span> {borclu.icraDosyaNumarasi}
-                          </div>
-                        )}
-                        {borclu.il && (
-                          <div>
-                            <span className="font-medium">İl:</span> {borclu.il}
-                          </div>
-                        )}
-                        {borclu.telefon1 && (
-                          <div>
-                            <span className="font-medium">Telefon:</span> {borclu.telefon1}
-                          </div>
-                        )}
-                      </div>
+            <Card key={borclu.id} className="p-4 hover:shadow-md transition-shadow border-l-4 border-l-blue-500">
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="font-bold text-lg text-primary">
+                      {borclu.muhatapTanimi || `Borçlu (TC: ${borclu.ilgiliTCKN || borclu.tcKimlikNo || 'Bilinmiyor'})`}
+                    </h3>
+                    <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                      {borclu.durumTanitici}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">
+                      <span className="font-medium">İlgili TCKN:</span> {borclu.ilgiliTCKN || 'Belirtilmemiş'}
+                    </p>
+                    {borclu.il && (
+                      <p className="text-sm text-muted-foreground">
+                        <span className="font-medium">İl:</span> {borclu.il}
+                      </p>
+                    )}
+                    {borclu.telefon && (
+                      <p className="text-sm text-muted-foreground">
+                        <span className="font-medium">Telefon:</span> {borclu.telefon}
+                      </p>
                     )}
                   </div>
-                  <div className="flex gap-2">
-                    <Link href={`/borclu/${borclu.durumTanitici}`}>
-                      <Button variant="outline" size="sm">
-                        Detay
-                      </Button>
-                    </Link>
+                </div>
+                <div className="text-right">
+                  <div className="bg-green-50 p-3 rounded-lg">
+                    <p className="text-xl font-bold text-green-700">
+                      ₺{(borclu.guncelBorc || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-xs text-green-600 font-medium">Güncel Borç</p>
                   </div>
                 </div>
-              </CardContent>
+              </div>
+
+              <div className="flex justify-between items-center pt-3 border-t">
+                <div className="text-xs text-muted-foreground">
+                  {borclu.icraDosyaNumarasi && (
+                    <span>İcra Dosya: {borclu.icraDosyaNumarasi}</span>
+                  )}
+                </div>
+                <Link href={`/borclular/${borclu.id}`}>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="hover:bg-blue-50 hover:text-blue-700"
+                  >
+                    Detay Görüntüle
+                  </Button>
+                </Link>
+              </div>
             </Card>
           ))
         )}

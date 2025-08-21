@@ -60,21 +60,13 @@ export async function GET(request: NextRequest) {
         take: validatedParams.limit,
         orderBy: {
           kayitTarihi: 'desc'
-        },
-        include: {
-          odemeSozleri: {
-            orderBy: {
-              sozTarihi: 'desc'
-            },
-            take: 1
-          }
         }
       }),
       prisma.borcluBilgileri.count({ where })
     ])
 
     return NextResponse.json({
-      data: borclular,
+      results: borclular,
       pagination: {
         page: validatedParams.page,
         limit: validatedParams.limit,

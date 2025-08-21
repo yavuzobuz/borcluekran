@@ -1,4 +1,4 @@
-Durum tanıtıcısı,İsim,Güncel Borç,Telefon,Adres,Notlar,İlgili TCKN,Avukat Atama Tarihi,Muhatap Tanımı
-TEST001,Test Borçlu 1,1500.50,05551234567,Test Adres 1,Test notu 1,12345678901,2024-01-15,Muhatap 1
-TEST002,Test Borçlu 2,2750.75,05559876543,Test Adres 2,Test notu 2,12345678902,2024-02-20,Muhatap 2
-TEST003,Test Borçlu 3,3200.00,05555555555,Test Adres 3,Test notu 3,12345678903,2024-03-10,Muhatap 3
+Durum tanıtıcısı,Güncel Borç,Telefon,Adres Bilgileri,İlgili TCKN,Avukat Atama Tarihi,Muhatap Tanımı,İl,İlçe,TC Kimlik No
+TEST001,1500.50,05551234567,Test Adres 1,12345678901,2024-01-15,Muhatap 1,İstanbul,Kadıköy,12345678901
+TEST002,2750.75,05559876543,Test Adres 2,12345678902,2024-02-20,Muhatap 2,Ankara,Çankaya,12345678902
+TEST003,3200.00,05555555555,Test Adres 3,12345678903,2024-03-10,Muhatap 3,İzmir,Konak,12345678903

@@ -231,12 +231,15 @@ export default function ExcelPage() {
                 <div className="space-y-3 text-sm text-gray-600">
                   <p className="font-medium text-gray-900">Gerekli Sütunlar:</p>
                   <ul className="space-y-1 ml-4">
-                    <li>• <strong>durumTanitici:</strong> Benzersiz tanımlayıcı (zorunlu)</li>
-                    <li>• <strong>isim:</strong> Borçlu adı (zorunlu)</li>
-                    <li>• <strong>borcMiktari:</strong> Borç miktarı (zorunlu)</li>
-                    <li>• <strong>telefon:</strong> Telefon numarası (opsiyonel)</li>
-                    <li>• <strong>email:</strong> E-posta adresi (opsiyonel)</li>
-                    <li>• <strong>adres:</strong> Adres bilgisi (opsiyonel)</li>
+                    <li>• <strong>Durum tanıtıcısı:</strong> Benzersiz tanımlayıcı (zorunlu)</li>
+                    <li>• <strong>İlgili TCKN:</strong> TC Kimlik Numarası (opsiyonel)</li>
+                    <li>• <strong>Avukat Atama Tarihi:</strong> Atama tarihi (opsiyonel)</li>
+                    <li>• <strong>Muhatap Tanımı:</strong> Muhatap bilgisi (opsiyonel)</li>
+                    <li>• <strong>Güncel Borç:</strong> Borç miktarı (opsiyonel)</li>
+                    <li>• <strong>Telefon:</strong> Telefon numarası (opsiyonel)</li>
+                    <li>• <strong>Adres Bilgileri:</strong> Adres bilgisi (opsiyonel)</li>
+                    <li>• <strong>İl:</strong> İl bilgisi (opsiyonel)</li>
+                    <li>• <strong>İlçe:</strong> İlçe bilgisi (opsiyonel)</li>
                   </ul>
                   <p className="text-xs text-gray-500 mt-3">
                     * Mevcut kayıtlar güncellenecek, yeni kayıtlar eklenecektir.

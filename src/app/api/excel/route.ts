@@ -11,9 +11,6 @@ export async function GET(request: NextRequest) {
     if (action === 'export') {
       // Tüm borçlu verilerini getir
       const borclular = await prisma.borcluBilgileri.findMany({
-        include: {
-          odemeSozleri: true
-        },
         orderBy: {
           kayitTarihi: 'desc'
         }
@@ -21,18 +18,20 @@ export async function GET(request: NextRequest) {
 
       // Excel formatına dönüştür
       const excelData = borclular.map(borclu => ({
-        'Durum Tanıtıcı': borclu.durumTanitici,
-        'İsim': borclu.isim || '',
-        'Borç Tutarı': borclu.borcTutari || 0,
+        'Durum tanıtıcısı': borclu.durumTanitici,
+        'İlgili TCKN': borclu.ilgiliTCKN || '',
+        'Avukat Atama Tarihi': borclu.avukatAtamaTarihi || '',
+        'Muhatap Tanımı': borclu.muhatapTanimi || '',
+        'Güncel Borç': borclu.guncelBorc || 0,
         'Telefon': borclu.telefon || '',
-        'Adres': borclu.adres || '',
-        'Notlar': borclu.notlar || '',
+        'Adres Bilgileri': borclu.adresBilgileri || '',
+        'İl': borclu.il || '',
+        'İlçe': borclu.ilce || '',
+        'TC Kimlik No': borclu.tcKimlikNo || '',
+        'Asıl Alacak': borclu.asilAlacak || 0,
+        'Toplam Açık Tutar': borclu.toplamAcikTutar || 0,
         'Kayıt Tarihi': borclu.kayitTarihi.toLocaleDateString('tr-TR'),
-        'Güncelleme Tarihi': borclu.guncellemeTarihi.toLocaleDateString('tr-TR'),
-        'Ödeme Sözü Sayısı': borclu.odemeSozleri.length,
-        'Son Ödeme Sözü': borclu.odemeSozleri.length > 0 
-          ? borclu.odemeSozleri[0].sozTarihi.toLocaleDateString('tr-TR')
-          : 'Yok'
+        'Güncelleme Tarihi': borclu.guncellemeTarihi.toLocaleDateString('tr-TR')
       }))
 
       // Excel dosyası oluştur
@@ -105,18 +104,31 @@ export async function POST(request: NextRequest) {
         const rowData = row as any
         
         // Gerekli alanları kontrol et
-        if (!rowData['Durum Tanıtıcı'] && !rowData['durum_tanitici']) {
+        if (!rowData['Durum Tanıtıcı'] && !rowData['durum_tanitici'] && !rowData['Durum tanıtıcısı']) {
           errors.push(`Satır ${index + 2}: Durum tanıtıcı eksik`)
           errorCount++
           continue
         }
 
         const durumTanitici = rowData['Durum Tanıtıcı'] || rowData['durum_tanitici'] || rowData['Durum tanıtıcısı']
-        const isim = rowData['İsim'] || rowData['isim'] || null
-        const borcTutari = parseFloat(rowData['Borç Tutarı'] || rowData['borc_tutari'] || rowData['Güncel Borç'] || rowData['guncel_borc'] || '0') || null
+        const ilgiliTCKN = rowData['İlgili TCKN'] || rowData['ilgili_tckn'] || null
+        
+        // Excel tarih formatını string'e dönüştür
+        let avukatAtamaTarihi = rowData['Avukat Atama Tarihi'] || rowData['avukat_atama_tarihi'] || null
+        if (avukatAtamaTarihi && typeof avukatAtamaTarihi === 'number') {
+          // Excel serial date'i JavaScript Date'e dönüştür
+          const excelDate = new Date((avukatAtamaTarihi - 25569) * 86400 * 1000)
+          avukatAtamaTarihi = excelDate.toISOString().split('T')[0] // YYYY-MM-DD formatı
+        }
+        const muhatapTanimi = rowData['Muhatap Tanımı'] || rowData['muhatap_tanimi'] || null
+        const guncelBorc = parseFloat(rowData['Güncel Borç'] || rowData['guncel_borc'] || '0') || null
         const telefon = rowData['Telefon'] || rowData['telefon'] || null
-        const adres = rowData['Adres'] || rowData['adres'] || null
-        const notlar = rowData['Notlar'] || rowData['notlar'] || null
+        const adresBilgileri = rowData['Adres Bilgileri'] || rowData['adres_bilgileri'] || rowData['Adres'] || null
+        const il = rowData['İl'] || rowData['il'] || null
+        const ilce = rowData['İlçe'] || rowData['ilce'] || null
+        const tcKimlikNo = rowData['TC Kimlik No'] || rowData['tc_kimlik_no'] || null
+        const asilAlacak = parseFloat(rowData['Asıl Alacak'] || rowData['asil_alacak'] || '0') || null
+        const toplamAcikTutar = parseFloat(rowData['Toplam Açık Tutar'] || rowData['toplam_acik_tutar'] || '0') || null
 
         // Upsert işlemi (varsa güncelle, yoksa ekle)
         await prisma.borcluBilgileri.upsert({
@@ -124,19 +136,31 @@ export async function POST(request: NextRequest) {
             durumTanitici: durumTanitici.toString()
           },
           update: {
-            isim,
-            borcTutari,
+            ilgiliTCKN,
+            avukatAtamaTarihi,
+            muhatapTanimi,
+            guncelBorc: guncelBorc || undefined,
             telefon,
-            adres,
-            notlar
+            adresBilgileri,
+            il,
+            ilce,
+            tcKimlikNo,
+            asilAlacak,
+            toplamAcikTutar
           },
           create: {
             durumTanitici: durumTanitici.toString(),
-            isim,
-            borcTutari,
+            ilgiliTCKN,
+            avukatAtamaTarihi,
+            muhatapTanimi,
+            guncelBorc,
             telefon,
-            adres,
-            notlar
+            adresBilgileri,
+            il,
+            ilce,
+            tcKimlikNo,
+            asilAlacak,
+            toplamAcikTutar
           }
         })
 

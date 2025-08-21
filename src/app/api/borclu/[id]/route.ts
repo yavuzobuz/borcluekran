@@ -1,23 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { durumTanitici: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { durumTanitici } = params
+    const { id: idParam } = await params
+    const id = parseInt(idParam)
+    
+    if (isNaN(id)) {
+      return NextResponse.json(
+        { error: 'Geçersiz ID formatı' },
+        { status: 400 }
+      )
+    }
 
     const borclu = await prisma.borcluBilgileri.findUnique({
       where: {
-        durumTanitici: durumTanitici
-      },
-      include: {
-        odemeSozleri: {
-          orderBy: {
-            sozTarihi: 'desc'
-          }
-        }
+        id: id
       }
     })
 
@@ -30,9 +33,9 @@ export async function GET(
 
     return NextResponse.json(borclu)
   } catch (error) {
-    console.error('Borclu detay error:', error)
+    console.error('Borçlu detayı getirme hatası:', error)
     return NextResponse.json(
-      { error: 'Borçlu detayları getirilirken bir hata oluştu' },
+      { error: 'Sunucu hatası' },
       { status: 500 }
     )
   }
