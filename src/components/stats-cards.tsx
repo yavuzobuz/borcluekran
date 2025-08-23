@@ -21,17 +21,37 @@ export function StatsCards() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Gerçek API çağrısı yerine örnek veri
-    // TODO: Gerçek API endpoint'i oluşturulduğunda burası güncellenecek
-    setTimeout(() => {
-      setStats({
-        totalDebtors: 1247,
-        totalDebt: 2850000,
-        thisMonthPromises: 89,
-        overduePromises: 23
-      })
-      setIsLoading(false)
-    }, 1000)
+    const fetchStats = async () => {
+      try {
+        const response = await fetch('/api/stats')
+        if (response.ok) {
+          const data = await response.json()
+          setStats(data)
+        } else {
+          console.error('Stats API error:', response.statusText)
+          // Fallback to example data
+          setStats({
+            totalDebtors: 0,
+            totalDebt: 0,
+            thisMonthPromises: 0,
+            overduePromises: 0
+          })
+        }
+      } catch (error) {
+        console.error('Stats fetch error:', error)
+        // Fallback to example data
+        setStats({
+          totalDebtors: 0,
+          totalDebt: 0,
+          thisMonthPromises: 0,
+          overduePromises: 0
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchStats()
   }, [])
 
   const formatCurrency = (amount: number) => {
@@ -55,19 +75,19 @@ export function StatsCards() {
       title: 'Toplam Borç',
       value: formatCurrency(stats.totalDebt),
       icon: TrendingUp,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100'
+      color: 'text-red-600',
+      bgColor: 'bg-red-100'
     },
     {
-      title: 'Bu Ay Sözler',
-      value: stats.thisMonthPromises.toString(),
+      title: 'Aktif Takipler',
+      value: (stats as any).activeDebtors?.toLocaleString('tr-TR') || stats.thisMonthPromises.toString(),
       icon: Calendar,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-100'
+      color: 'text-orange-600',
+      bgColor: 'bg-orange-100'
     },
     {
-      title: 'Geciken Sözler',
-      value: stats.overduePromises.toString(),
+      title: 'Problemli Dosyalar',
+      value: (stats as any).problematicDebtors?.toLocaleString('tr-TR') || stats.overduePromises.toString(),
       icon: AlertTriangle,
       color: 'text-red-600',
       bgColor: 'bg-red-100'

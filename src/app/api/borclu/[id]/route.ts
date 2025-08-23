@@ -9,20 +9,27 @@ export async function GET(
 ) {
   try {
     const { id: idParam } = await params
-    const id = parseInt(idParam)
     
-    if (isNaN(id)) {
-      return NextResponse.json(
-        { error: 'Geçersiz ID formatı' },
-        { status: 400 }
-      )
+    // Önce ID olarak dene
+    const numericId = parseInt(idParam)
+    let borclu = null
+    
+    if (!isNaN(numericId)) {
+      borclu = await prisma.borcluBilgileri.findUnique({
+        where: {
+          id: numericId
+        }
+      })
     }
-
-    const borclu = await prisma.borcluBilgileri.findUnique({
-      where: {
-        id: id
-      }
-    })
+    
+    // ID ile bulunamadıysa durumTanitici ile dene
+    if (!borclu) {
+      borclu = await prisma.borcluBilgileri.findFirst({
+        where: {
+          durumTanitici: idParam
+        }
+      })
+    }
 
     if (!borclu) {
       return NextResponse.json(

@@ -2,6 +2,7 @@ import { SearchForm } from '@/components/search-form'
 import { RecentDebtors } from '@/components/recent-debtors'
 import { StatsCards } from '@/components/stats-cards'
 import { Header } from '@/components/header'
+import { TodaysPaymentPromises } from '@/components/todays-payment-promises'
 
 export default function Home() {
   return (
@@ -27,6 +28,7 @@ export default function Home() {
           {/* İstatistikler */}
           <div className="space-y-6">
             <StatsCards />
+            <TodaysPaymentPromises />
             <RecentDebtors />
           </div>
         </div>

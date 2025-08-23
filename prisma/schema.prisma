@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,46 +8,68 @@ datasource db {
 }
 
 model BorcluBilgileri {
-  id                      Int      @id @default(autoincrement())
-  ilgiliTCKN              String?  @map("ilgili_tckn")
-  avukatAtamaTarihi       String?  @map("avukat_atama_tarihi")
-  durum                   String?
-  durumTanitici           String   @unique @map("durum_tanitici")
-  muhatapTanimi           String?  @map("muhatap_tanimi")
-  durumTanimi             String?  @map("durum_tanimi")
-  sozlesmeHesabi          String?  @map("sozlesme_hesabi")
-  tcKimlikNo              String?  @map("tc_kimlik_no")
-  vergiNo                 String?  @map("vergi_no")
-  icraDosyaNumarasi       String?  @map("icra_dosya_numarasi")
-  icraDairesiTanimi       String?  @map("icra_dairesi_tanimi")
-  adresBilgileri          String?  @map("adres_bilgileri")
-  il                      String?
-  ilce                    String?
-  telefon                 String?
-  telefonAboneGrubu       String?  @map("telefon_abone_grubu")
-  asilAlacak              Float?   @map("asil_alacak")
-  takipCikisMiktari       Float?   @map("takip_cikis_miktari")
-  takipOncesiTahsilat     Float?   @map("takip_oncesi_tahsilat")
-  takipSonrasiTahsilat    Float?   @map("takip_sonrasi_tahsilat")
-  toplamAcikTutar         Float?   @map("toplam_acik_tutar")
-  guncelBorc              Float?   @map("guncel_borc")
-  itirazDurumu            String?  @map("itiraz_durumu")
-  borcluTipiTanimi        String?  @map("borclu_tipi_tanimi")
-  hitamTarihi             String?  @map("hitam_tarihi")
-  takipTarihi             String?  @map("takip_tarihi")
-  nedenTanimi             String?  @map("neden_tanimi")
-  durumTuru               String?  @map("durum_turu")
-  durumTuruTanimi         String?  @map("durum_turu_tanimi")
-  tesisatDurumu           String?  @map("tesisat_durumu")
-  odemeDurumu             String?  @map("odeme_durumu")
-  vekaletUcreti           Float?   @map("vekalet_ucreti")
-  neden                   String?
-  muhatapTanimiEk         String?  @map("muhatap_tanimi_ek")
-  uyapDurumu              String?  @map("uyap_durumu")
-  telefonTesisat          String?  @map("telefon_tesisat")
-  tesisatDurumuTanimi     String?  @map("tesisat_durumu_tanimi")
-  kayitTarihi             DateTime @default(now()) @map("kayit_tarihi")
-  guncellemeTarihi        DateTime @updatedAt @map("guncelleme_tarihi")
-  
+  id                   Int      @id @default(autoincrement())
+  ilgiliTCKN           String?  @map("ilgili_tckn")
+  avukatAtamaTarihi    String?  @map("avukat_atama_tarihi")
+  durum                String?
+  durumTanitici        String   @unique @map("durum_tanitici")
+  muhatapTanimi        String?  @map("muhatap_tanimi")
+  durumTanimi          String?  @map("durum_tanimi")
+  sozlesmeHesabi       String?  @map("sozlesme_hesabi")
+  tcKimlikNo           String?  @map("tc_kimlik_no")
+  ad                   String?
+  soyad                String?
+  isim                 String?
+  vergiNo              String?  @map("vergi_no")
+  icraDosyaNumarasi    String?  @map("icra_dosya_numarasi")
+  icraDairesiTanimi    String?  @map("icra_dairesi_tanimi")
+  adresBilgileri       String?  @map("adres_bilgileri")
+  il                   String?
+  ilce                 String?
+  telefon              String?
+  telefonAboneGrubu    String?  @map("telefon_abone_grubu")
+  asilAlacak           Float?   @map("asil_alacak")
+  takipCikisMiktari    Float?   @map("takip_cikis_miktari")
+  takipOncesiTahsilat  Float?   @map("takip_oncesi_tahsilat")
+  takipSonrasiTahsilat Float?   @map("takip_sonrasi_tahsilat")
+  toplamAcikTutar      Float?   @map("toplam_acik_tutar")
+  guncelBorc           Float?   @map("guncel_borc")
+  itirazDurumu         String?  @map("itiraz_durumu")
+  borcluTipiTanimi     String?  @map("borclu_tipi_tanimi")
+  hitamTarihi          String?  @map("hitam_tarihi")
+  takipTarihi          String?  @map("takip_tarihi")
+  nedenTanimi          String?  @map("neden_tanimi")
+  durumTuru            String?  @map("durum_turu")
+  durumTuruTanimi      String?  @map("durum_turu_tanimi")
+  tesisatDurumu        String?  @map("tesisat_durumu")
+  odemeDurumu          String?  @map("odeme_durumu")
+  vekaletUcreti        Float?   @map("vekalet_ucreti")
+  neden                String?
+  muhatapTanimiEk      String?  @map("muhatap_tanimi_ek")
+  uyapDurumu           String?  @map("uyap_durumu")
+  telefonTesisat       String?  @map("telefon_tesisat")
+  tesisatDurumuTanimi  String?  @map("tesisat_durumu_tanimi")
+  kayitTarihi          DateTime @default(now()) @map("kayit_tarihi")
+  guncellemeTarihi     DateTime @updatedAt @map("guncelleme_tarihi")
+
+  // İlişkiler
+  odemeSozleri         OdemeSozu[] @relation("BorcluOdemeSozleri")
+
   @@map("borclu_bilgileri")
+}
+
+model OdemeSozu {
+  id               Int              @id @default(autoincrement())
+  borcluId         Int              @map("borclu_id")
+  tarih            DateTime         @map("tarih")
+  aciklama         String           @map("aciklama")
+  odemeMiktari     Float?           @map("odeme_miktari")
+  durum            String           @default("Aktif") @map("durum") // Aktif, İptal, Tamamlandı
+  olusturmaTarihi  DateTime         @default(now()) @map("olusturma_tarihi")
+  guncellemeTarihi DateTime         @updatedAt @map("guncelleme_tarihi")
+
+  // İlişkiler
+  borclu           BorcluBilgileri  @relation("BorcluOdemeSozleri", fields: [borcluId], references: [id], onDelete: Cascade)
+
+  @@map("odeme_sozleri")
 }

@@ -6,8 +6,11 @@ import { Header } from '@/components/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, User, Phone, MapPin, Calendar, CreditCard, FileText } from 'lucide-react'
+import { ArrowLeft, User, Phone, MapPin, Calendar, CreditCard, FileText, Plus } from 'lucide-react'
 import Link from 'next/link'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 
 interface BorcluDetay {
   id: number
@@ -59,6 +62,13 @@ export default function BorcluDetayPage() {
   
   const [borclu, setBorclu] = useState<BorcluDetay | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [odemeSozu, setOdemeSozu] = useState({
+    tarih: '',
+    miktar: '',
+    aciklama: ''
+  })
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     if (id) {
@@ -90,6 +100,44 @@ export default function BorcluDetayPage() {
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return 'Belirtilmemiş'
     return new Date(dateString).toLocaleDateString('tr-TR')
+  }
+
+  const handleOdemeSozuKaydet = async () => {
+    if (!odemeSozu.tarih || !odemeSozu.aciklama) {
+      alert('Lütfen tarih ve açıklama alanlarını doldurun')
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const response = await fetch('/api/odeme-sozu', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          borcluId: borclu?.id,
+          tarih: odemeSozu.tarih,
+          aciklama: odemeSozu.aciklama,
+          odemeMiktari: odemeSozu.miktar ? parseFloat(odemeSozu.miktar) : null
+        })
+      })
+
+      const result = await response.json()
+      
+      if (response.ok && result.success) {
+        alert('Ödeme sözü başarıyla kaydedildi')
+        setIsDialogOpen(false)
+        setOdemeSozu({ tarih: '', miktar: '', aciklama: '' })
+      } else {
+        alert(result.error || 'Ödeme sözü kaydedilirken bir hata oluştu')
+      }
+    } catch (error) {
+      console.error('Ödeme sözü kaydetme hatası:', error)
+      alert('Ödeme sözü kaydedilirken bir hata oluştu')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   if (isLoading) {
@@ -316,6 +364,13 @@ export default function BorcluDetayPage() {
                   <Badge variant="outline" className="ml-2">{borclu.durumTanitici}</Badge>
                 </div>
                 
+                {borclu.durumTanimi && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Durum Tanımı</label>
+                    <p className="font-semibold">{borclu.durumTanimi}</p>
+                  </div>
+                )}
+                
                 {borclu.odemeDurumu && (
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Ödeme Durumu</label>
@@ -352,6 +407,90 @@ export default function BorcluDetayPage() {
               </CardContent>
             </Card>
           </div>
+        </div>
+
+        {/* Ödeme Sözü Ekleme Butonu */}
+        <div className="mt-8 flex justify-center space-x-4">
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-green-600 hover:bg-green-700">
+                <Plus className="w-4 h-4 mr-2" />
+                Ödeme Sözü Ekle
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Yeni Ödeme Sözü Ekle</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <label htmlFor="tarih" className="text-right text-sm font-medium">
+                    Tarih *
+                  </label>
+                  <Input
+                    id="tarih"
+                    type="date"
+                    value={odemeSozu.tarih}
+                    onChange={(e) => setOdemeSozu({ ...odemeSozu, tarih: e.target.value })}
+                    className="col-span-3"
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <label htmlFor="aciklama" className="text-right text-sm font-medium">
+                    Açıklama *
+                  </label>
+                  <Textarea
+                    id="aciklama"
+                    placeholder="Ödeme sözü ile ilgili açıklama..."
+                    value={odemeSozu.aciklama}
+                    onChange={(e) => setOdemeSozu({ ...odemeSozu, aciklama: e.target.value })}
+                    className="col-span-3"
+                    rows={3}
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <label htmlFor="miktar" className="text-right text-sm font-medium">
+                    Miktar (₺)
+                  </label>
+                  <Input
+                    id="miktar"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00 (opsiyonel)"
+                    value={odemeSozu.miktar}
+                    onChange={(e) => setOdemeSozu({ ...odemeSozu, miktar: e.target.value })}
+                    className="col-span-3"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
+                  disabled={isSaving}
+                >
+                  İptal
+                </Button>
+                <Button
+                  onClick={handleOdemeSozuKaydet}
+                  disabled={isSaving}
+                >
+                  {isSaving ? 'Kaydediliyor...' : 'Kaydet'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Link href={`/odeme-sozleri?durumTanitici=${borclu?.durumTanitici}`}>
+            <Button variant="outline">
+              <Calendar className="w-4 h-4 mr-2" />
+              Ödeme Sözleri
+            </Button>
+          </Link>
+          <Link href="/borclular">
+            <Button variant="outline">
+              Borçlu Listesi
+            </Button>
+          </Link>
         </div>
       </div>
     </div>

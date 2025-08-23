@@ -3,52 +3,61 @@ import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 
 const searchSchema = z.object({
-  name: z.string().optional(),
+  isim: z.string().optional(),
   durumTanitici: z.string().optional(),
-  minBorc: z.number().optional(),
-  maxBorc: z.number().optional(),
+  minBorcMiktari: z.string().optional(),
+  maxBorcMiktari: z.string().optional(),
+  durum: z.string().optional(),
   page: z.number().default(1),
   limit: z.number().default(10),
-})
+});
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
+    const { searchParams } = new URL(request.url);
     
     const params = {
-      name: searchParams.get('name') || undefined,
+      isim: searchParams.get('isim') || undefined,
       durumTanitici: searchParams.get('durumTanitici') || undefined,
-      minBorc: searchParams.get('minBorc') ? Number(searchParams.get('minBorc')) : undefined,
-      maxBorc: searchParams.get('maxBorc') ? Number(searchParams.get('maxBorc')) : undefined,
+      minBorcMiktari: searchParams.get('minBorcMiktari') || undefined,
+      maxBorcMiktari: searchParams.get('maxBorcMiktari') || undefined,
+      durum: searchParams.get('durum') || undefined,
       page: searchParams.get('page') ? Number(searchParams.get('page')) : 1,
       limit: searchParams.get('limit') ? Number(searchParams.get('limit')) : 10,
-    }
+    };
 
-    const validatedParams = searchSchema.parse(params)
+    const validatedParams = searchSchema.parse(params);
     
-    const where: any = {}
+    const where: any = {};
     
-    if (validatedParams.name) {
-      where.isim = {
-        contains: validatedParams.name,
-        mode: 'insensitive'
-      }
+    if (validatedParams.isim) {
+      where.OR = [
+        { isim: { contains: validatedParams.isim, mode: 'insensitive' } },
+        { ad: { contains: validatedParams.isim, mode: 'insensitive' } },
+        { soyad: { contains: validatedParams.isim, mode: 'insensitive' } },
+        { muhatapTanimi: { contains: validatedParams.isim, mode: 'insensitive' } },
+      ];
     }
     
     if (validatedParams.durumTanitici) {
       where.durumTanitici = {
-        contains: validatedParams.durumTanitici
-      }
+        contains: validatedParams.durumTanitici,
+        mode: 'insensitive',
+      };
     }
     
-    if (validatedParams.minBorc || validatedParams.maxBorc) {
-      where.borcTutari = {}
-      if (validatedParams.minBorc) {
-        where.borcTutari.gte = validatedParams.minBorc
+    if (validatedParams.minBorcMiktari || validatedParams.maxBorcMiktari) {
+      where.borcMiktari = {};
+      if (validatedParams.minBorcMiktari) {
+        where.borcMiktari.gte = Number(validatedParams.minBorcMiktari);
       }
-      if (validatedParams.maxBorc) {
-        where.borcTutari.lte = validatedParams.maxBorc
+      if (validatedParams.maxBorcMiktari) {
+        where.borcMiktari.lte = Number(validatedParams.maxBorcMiktari);
       }
+    }
+
+    if (validatedParams.durum && validatedParams.durum !== 'ALL') {
+      where.durum = validatedParams.durum;
     }
 
     const skip = (validatedParams.page - 1) * validatedParams.limit
@@ -66,7 +75,8 @@ export async function GET(request: NextRequest) {
     ])
 
     return NextResponse.json({
-      results: borclular,
+      data: borclular,
+      total,
       pagination: {
         page: validatedParams.page,
         limit: validatedParams.limit,

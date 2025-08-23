@@ -1,0 +1,72 @@
+import { NextResponse } from 'next/server'
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
+
+export async function GET() {
+  try {
+    // Toplam borçlu sayısı
+    const totalDebtors = await prisma.borcluBilgileri.count()
+    
+    // Toplam borç miktarı
+    const totalDebtResult = await prisma.borcluBilgileri.aggregate({
+      _sum: {
+        guncelBorc: true
+      }
+    })
+    
+    // Aktif durumlar (Derdest, İcra Takibi vs.)
+    const activeDebtors = await prisma.borcluBilgileri.count({
+      where: {
+        OR: [
+          { durumTanimi: { contains: 'Derdest' } },
+          { durumTanimi: { contains: 'İcra Takibi' } },
+          { durumTanimi: { contains: 'Takip' } },
+          { durumTuruTanimi: { contains: 'İcra Takibi' } }
+        ]
+      }
+    })
+    
+    // Ödenen/Kapatılan durumlar
+    const paidDebtors = await prisma.borcluBilgileri.count({
+      where: {
+        OR: [
+          { durumTanimi: { contains: 'Ödendi' } },
+          { durumTanimi: { contains: 'Kapandı' } },
+          { durumTanimi: { contains: 'Tahsil' } },
+          { durumTanimi: { contains: 'Hitam' } }
+        ]
+      }
+    })
+    
+    // İtirazlı/Problemli durumlar
+    const problematicDebtors = await prisma.borcluBilgileri.count({
+      where: {
+        OR: [
+          { itirazDurumu: { not: null } },
+          { durumTanimi: { contains: 'İtiraz' } },
+          { durumTanimi: { contains: 'Problem' } }
+        ]
+      }
+    })
+    
+    return NextResponse.json({
+      totalDebtors,
+      totalDebt: totalDebtResult._sum.guncelBorc || 0,
+      activeDebtors,
+      paidDebtors,
+      problematicDebtors,
+      // Eski alanlar (geriye uyumluluk için)
+      thisMonthPromises: activeDebtors,
+      overduePromises: problematicDebtors
+    })
+  } catch (error) {
+    console.error('Stats API error:', error)
+    return NextResponse.json(
+      { error: 'İstatistikler alınırken hata oluştu' },
+      { status: 500 }
+    )
+  } finally {
+    await prisma.$disconnect()
+  }
+}

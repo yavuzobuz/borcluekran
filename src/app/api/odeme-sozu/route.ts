@@ -1,25 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
 
-const odemeSozuSchema = z.object({
-  durumTanitici: z.string().min(1, 'Durum tanıtıcı gerekli'),
-  sozTarihi: z.string().transform((str) => new Date(str)),
-  sozTutari: z.number().positive('Söz tutarı pozitif olmalı'),
-  aciklama: z.string().optional(),
-})
-
+// Ödeme sözü ekleme
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const validatedData = odemeSozuSchema.parse(body)
+    const { borcluId, durumTanitici, tarih, aciklama, odemeMiktari } = body
 
-    // Borçlunun var olup olmadığını kontrol et
-    const borclu = await prisma.borcluBilgileri.findUnique({
-      where: {
-        durumTanitici: validatedData.durumTanitici
-      }
-    })
+    if (!tarih || !aciklama) {
+      return NextResponse.json(
+        { error: 'Tarih ve açıklama zorunludur' },
+        { status: 400 }
+      )
+    }
+
+    let borclu
+    
+    // Borçluyu borcluId veya durumTanitici ile bul
+    if (borcluId) {
+      borclu = await prisma.borcluBilgileri.findUnique({
+        where: { id: parseInt(borcluId) }
+      })
+    } else if (durumTanitici) {
+      borclu = await prisma.borcluBilgileri.findUnique({
+        where: { durumTanitici: durumTanitici }
+      })
+    } else {
+      return NextResponse.json(
+        { error: 'Borçlu ID veya durum tanıtıcı gerekli' },
+        { status: 400 }
+      )
+    }
 
     if (!borclu) {
       return NextResponse.json(
@@ -28,61 +39,92 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Ödeme sözü ekle
     const odemeSozu = await prisma.odemeSozu.create({
       data: {
-        durumTanitici: validatedData.durumTanitici,
-        sozTarihi: validatedData.sozTarihi,
-        sozTutari: validatedData.sozTutari,
-        aciklama: validatedData.aciklama,
+        borcluId: borclu.id,
+        tarih: new Date(tarih),
+        aciklama,
+        odemeMiktari: odemeMiktari ? parseFloat(odemeMiktari) : null
       }
     })
 
-    return NextResponse.json(odemeSozu, { status: 201 })
-  } catch (error) {
-    console.error('Ödeme sözü ekleme error:', error)
-    
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Geçersiz veri', details: error.issues },
-        { status: 400 }
-      )
-    }
+    return NextResponse.json({
+      success: true,
+      message: 'Ödeme sözü başarıyla eklendi',
+      data: odemeSozu
+    })
 
+  } catch (error) {
+    console.error('Ödeme sözü ekleme hatası:', error)
     return NextResponse.json(
-      { error: 'Ödeme sözü eklenirken bir hata oluştu' },
+      { error: 'Ödeme sözü eklenirken hata oluştu' },
       { status: 500 }
     )
+  } finally {
+    await prisma.$disconnect()
   }
 }
 
+// Ödeme sözlerini listeleme
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const durumTanitici = searchParams.get('durumTanitici')
+    const borcluId = searchParams.get('borcluId')
+    const startDate = searchParams.get('startDate')
+    const endDate = searchParams.get('endDate')
+    const limit = parseInt(searchParams.get('limit') || '50')
 
-    if (!durumTanitici) {
-      return NextResponse.json(
-        { error: 'Durum tanıtıcı gerekli' },
-        { status: 400 }
-      )
+    let whereClause: any = {}
+    if (borcluId) {
+      whereClause.borcluId = parseInt(borcluId)
+    }
+
+    // Tarih aralığı filtresi
+    if (startDate || endDate) {
+      whereClause.tarih = {}
+      if (startDate) {
+        whereClause.tarih.gte = new Date(startDate)
+      }
+      if (endDate) {
+        // Bitiş tarihine günün sonunu ekle
+        const endDateTime = new Date(endDate)
+        endDateTime.setHours(23, 59, 59, 999)
+        whereClause.tarih.lte = endDateTime
+      }
     }
 
     const odemeSozleri = await prisma.odemeSozu.findMany({
-      where: {
-        durumTanitici: durumTanitici
+      where: whereClause,
+      include: {
+        borclu: {
+          select: {
+            id: true,
+            durumTanitici: true,
+            muhatapTanimi: true,
+            ad: true,
+            soyad: true
+          }
+        }
       },
       orderBy: {
-        sozTarihi: 'desc'
-      }
+        tarih: 'desc'
+      },
+      take: limit
     })
 
-    return NextResponse.json(odemeSozleri)
+    return NextResponse.json({
+      success: true,
+      data: odemeSozleri,
+      count: odemeSozleri.length
+    })
+
   } catch (error) {
-    console.error('Ödeme sözleri getirme error:', error)
+    console.error('Ödeme sözleri listeleme hatası:', error)
     return NextResponse.json(
-      { error: 'Ödeme sözleri getirilirken bir hata oluştu' },
+      { error: 'Ödeme sözleri listelenirken hata oluştu' },
       { status: 500 }
     )
+  } finally {
+    await prisma.$disconnect()
   }
 }

@@ -12,6 +12,7 @@ interface Debtor {
   avukatAtamaTarihi?: string            // Avukat Atama Tarihi
   durumTanitici: string                 // Durum tanıtıcısı
   muhatapTanimi: string                 // Muhatap tanımı
+  muhatapTanimiEk?: string              // Muhatap tanımı (ek)
   durumTanimi: string                   // Durum Tanımı
   sozlesmeHesabi: string                // Sözleşme hesabı
   tcKimlikNo: string                    // TC kimlik no
@@ -62,68 +63,30 @@ interface Debtor {
 
 export function RecentDebtors() {
   const [debtors, setDebtors] = useState<Debtor[]>([])
+  const [todayCount, setTodayCount] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Gerçek API çağrısı yerine örnek veri
-    // TODO: Gerçek API endpoint'i oluşturulduğunda burası güncellenecek
-    setTimeout(() => {
-      setDebtors([
-        {
-          ilgiliTCKN: '20993104806',
-          durumTanitici: '21777660',
-          muhatapTanimi: 'CENGİZ KAMA / ÇAKMAK-MERKEZ',
-          durumTanimi: '25 Derdest',
-          sozlesmeHesabi: '5001693081',
-          tcKimlikNo: '20993104806',
-          guncelBorc: 21851.69,
-          odemeDurumu: 'Aktif',
-          il: 'İSTANBUL',
-          telefon1: '5313820199',
-          icraDosyaNumarasi: '2025/10722',
-          // Eski alanlar
-          isim: 'CENGİZ KAMA',
-          borcMiktari: 21851.69,
-          sonOdemeTarihi: '2024-01-15',
-          durum: 'Aktif'
-        },
-        {
-          ilgiliTCKN: '12345678901',
-          durumTanitici: 'D002',
-          muhatapTanimi: 'Fatma Kaya / MERKEZ',
-          durumTanimi: 'Beklemede',
-          sozlesmeHesabi: '5001693082',
-          tcKimlikNo: '12345678901',
-          guncelBorc: 8500,
-          odemeDurumu: 'Beklemede',
-          il: 'ANKARA',
-          telefon1: '5321234567',
-          // Eski alanlar
-          isim: 'Fatma Kaya',
-          borcMiktari: 8500,
-          sonOdemeTarihi: '2024-01-20',
-          durum: 'Beklemede'
-        },
-        {
-          ilgiliTCKN: '98765432109',
-          durumTanitici: 'D003',
-          muhatapTanimi: 'Mehmet Demir / ÇANKAYA',
-          durumTanimi: 'Gecikmiş',
-          sozlesmeHesabi: '5001693083',
-          tcKimlikNo: '98765432109',
-          guncelBorc: 22000,
-          odemeDurumu: 'Gecikmiş',
-          il: 'İZMİR',
-          telefon1: '5339876543',
-          // Eski alanlar
-          isim: 'Mehmet Demir',
-          borcMiktari: 22000,
-          sonOdemeTarihi: '2024-01-10',
-          durum: 'Gecikmiş'
+    const fetchRecentDebtors = async () => {
+      try {
+        const response = await fetch('/api/recent-debtors')
+        if (response.ok) {
+          const result = await response.json()
+          setDebtors(result.data || [])
+          setTodayCount(result.todayCount || 0)
+        } else {
+          console.error('Recent debtors API error:', response.statusText)
+          setDebtors([])
         }
-      ])
-      setIsLoading(false)
-    }, 800)
+      } catch (error) {
+        console.error('Recent debtors fetch error:', error)
+        setDebtors([])
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchRecentDebtors()
   }, [])
 
   const formatCurrency = (amount: number) => {
@@ -183,9 +146,17 @@ export function RecentDebtors() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <TrendingUp className="w-5 h-5" />
-          <span>Son Borçlular</span>
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <TrendingUp className="w-5 h-5" />
+            <span>Son Borçlular</span>
+          </div>
+          {todayCount > 0 && (
+            <div className="flex items-center space-x-1 text-sm text-green-600">
+              <Calendar className="w-4 h-4" />
+              <span>Bugün: {todayCount}</span>
+            </div>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -198,7 +169,9 @@ export function RecentDebtors() {
               <div className="flex-1">
                 <div className="flex items-center space-x-3">
                   <div>
-                    <h4 className="font-medium text-gray-900">{debtor.muhatapTanimi || debtor.isim}</h4>
+                    <h4 className="font-medium text-gray-900">
+                      {getDisplayName(debtor)}
+                    </h4>
                     <p className="text-sm text-gray-500">
                       {debtor.durumTanitici} • {formatCurrency(debtor.guncelBorc || debtor.borcMiktari || 0)}
                     </p>
@@ -243,5 +216,39 @@ export function RecentDebtors() {
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+
+const getDisplayName = (debtor: Debtor) => {
+  // Muhatap tanımını temizle (eğer "Borçlu" içeriyorsa)
+  let cleanMuhatapTanimi = debtor.muhatapTanimi ? debtor.muhatapTanimi.trim() : ''
+  // Muhatap tanımı gerçek isim içerdiği için sadece "Borçlu" kelimesi varsa temizle
+  if (cleanMuhatapTanimi.toLowerCase() === 'borçlu' || cleanMuhatapTanimi.toLowerCase() === 'borclu') {
+    cleanMuhatapTanimi = ''
+  }
+  
+  // Muhatap tanımı ek'i temizle (eğer "Borçlu" içeriyorsa)
+  let cleanMuhatapTanimiEk = debtor.muhatapTanimiEk ? debtor.muhatapTanimiEk.trim() : ''
+  // Muhatap tanımı ek gerçek isim içerdiği için sadece "Borçlu" kelimesi varsa temizle
+  if (cleanMuhatapTanimiEk.toLowerCase() === 'borçlu' || cleanMuhatapTanimiEk.toLowerCase() === 'borclu') {
+    cleanMuhatapTanimiEk = ''
+  }
+  
+  // Muhatap tanımını parçalara ayır ve "/ " ile ayrılmış kısımları kontrol et
+  if (cleanMuhatapTanimi && cleanMuhatapTanimi.includes('/')) {
+    // "CENGİZ KAMA / ÇAKMAK-MERKEZ" gibi formatta ise, ilk kısmı al
+    const parts = cleanMuhatapTanimi.split('/')
+    if (parts.length > 0 && parts[0].trim()) {
+      cleanMuhatapTanimi = parts[0].trim()
+    }
+  }
+  
+  // Öncelik sırası: temizlenmiş muhatapTanimi > temizlenmiş muhatapTanimiEk > borcluTipiTanimi > durumTanitici
+  return (
+    (cleanMuhatapTanimi || undefined) ||
+    (cleanMuhatapTanimiEk || undefined) ||
+    (debtor.borcluTipiTanimi && !debtor.borcluTipiTanimi.toLowerCase().includes('borçlu') ? debtor.borcluTipiTanimi.trim() : undefined) ||
+    debtor.durumTanitici || "İsimsiz Borçlu"
   )
 }

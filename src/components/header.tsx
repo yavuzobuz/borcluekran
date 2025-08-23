@@ -1,7 +1,7 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
-import { FileSpreadsheet, Search, Users, BarChart3 } from 'lucide-react'
+import { FileSpreadsheet, Search, Users, BarChart3, Calendar } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -11,6 +11,7 @@ export function Header() {
   const navigation = [
     { name: 'Ana Sayfa', href: '/', icon: Search },
     { name: 'Borçlu Listesi', href: '/borclular', icon: Users },
+    { name: 'Ödeme Sözleri', href: '/odeme-sozleri', icon: Calendar },
     { name: 'Analiz', href: '/analiz', icon: BarChart3 },
     { name: 'Excel İşlemleri', href: '/excel', icon: FileSpreadsheet },
   ]

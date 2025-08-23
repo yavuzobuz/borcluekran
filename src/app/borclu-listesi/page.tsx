@@ -19,6 +19,11 @@ interface Debtor {
   durum: string
   telefon?: string
   email?: string
+  muhatapTanimi?: string
+  muhatapTanimiEk?: string
+  ad?: string
+  soyad?: string
+  ilgiliTCKN?: string
 }
 
 interface SearchFilters {
@@ -66,9 +71,11 @@ export default function BorcluListesiPage() {
       const response = await fetch(`/api/search?${queryParams}`)
       if (response.ok) {
         const data = await response.json()
-        setDebtors(data.data)
-        setFilteredDebtors(data.data)
-        setTotalPages(Math.ceil(data.total / itemsPerPage))
+        const list: Debtor[] = Array.isArray(data?.data) ? data.data : []
+        setDebtors(list)
+        setFilteredDebtors(list)
+        const total = typeof data?.total === 'number' && data.total >= 0 ? data.total : list.length
+        setTotalPages(Math.max(1, Math.ceil(total / itemsPerPage)))
       } else {
         // Hata durumunda örnek veri göster
         showSampleData()
@@ -135,7 +142,8 @@ export default function BorcluListesiPage() {
   }
 
   const handleFilterChange = (key: keyof SearchFilters, value: string) => {
-    setFilters(prev => ({ ...prev, [key]: value }))
+    const normalized = key === 'durum' && (value === 'ALL' || value === '') ? '' : value
+    setFilters(prev => ({ ...prev, [key]: normalized }))
     setCurrentPage(1)
   }
 
@@ -197,6 +205,36 @@ export default function BorcluListesiPage() {
       default:
         return 'text-gray-600 bg-gray-100'
     }
+  }
+
+  const composeName = (d: Debtor) => {
+    // Muhatap tanımını temizle (eğer "Borçlu" içeriyorsa)
+    let cleanMuhatapTanimi = d.muhatapTanimi ? d.muhatapTanimi.trim() : ''
+    if (cleanMuhatapTanimi.toLowerCase() === 'borçlu' || cleanMuhatapTanimi.toLowerCase() === 'borclu') {
+      cleanMuhatapTanimi = ''
+    }
+    
+    // "CENGİZ KAMA / ÇAKMAK-MERKEZ" gibi formatta ise, ilk kısmı al
+    if (cleanMuhatapTanimi && cleanMuhatapTanimi.includes('/')) {
+      const parts = cleanMuhatapTanimi.split('/')
+      if (parts.length > 0 && parts[0].trim()) {
+        cleanMuhatapTanimi = parts[0].trim()
+      }
+    }
+    
+    // Muhatap tanımı ek'i temizle (eğer "Borçlu" içeriyorsa)
+    let cleanMuhatapTanimiEk = d.muhatapTanimiEk ? d.muhatapTanimiEk.trim() : ''
+    if (cleanMuhatapTanimiEk.toLowerCase() === 'borçlu' || cleanMuhatapTanimiEk.toLowerCase() === 'borclu') {
+      cleanMuhatapTanimiEk = ''
+    }
+    
+    // Öncelik sırası: temizlenmiş muhatapTanimi > temizlenmiş muhatapTanimiEk > durumTanitici
+    return (
+      (cleanMuhatapTanimi || undefined) ||
+      (cleanMuhatapTanimiEk || undefined) ||
+      d.durumTanitici ||
+      "İsimsiz Borçlu"
+    )
   }
 
   return (
@@ -263,7 +301,7 @@ export default function BorcluListesiPage() {
                     <SelectValue placeholder="Durum seçin" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Tümü</SelectItem>
+                    <SelectItem value="ALL">Tümü</SelectItem>
                     <SelectItem value="Aktif">Aktif</SelectItem>
                     <SelectItem value="Beklemede">Beklemede</SelectItem>
                     <SelectItem value="Gecikmiş">Gecikmiş</SelectItem>
@@ -286,7 +324,7 @@ export default function BorcluListesiPage() {
         {/* Borçlu Listesi */}
         <Card>
           <CardHeader>
-            <CardTitle>Borçlular ({filteredDebtors.length})</CardTitle>
+            <CardTitle>Borçlular ({filteredDebtors?.length ?? 0})</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -303,7 +341,7 @@ export default function BorcluListesiPage() {
                   </div>
                 ))}
               </div>
-            ) : filteredDebtors.length === 0 ? (
+            ) : (filteredDebtors?.length ?? 0) === 0 ? (
               <div className="text-center py-8">
                 <p className="text-gray-500">Hiç borçlu bulunamadı.</p>
               </div>
@@ -317,7 +355,7 @@ export default function BorcluListesiPage() {
                     <div className="flex-1">
                       <div className="flex items-center space-x-4">
                         <div>
-                          <h4 className="font-medium text-gray-900">{debtor.isim}</h4>
+                          <h4 className="font-medium text-gray-900">{composeName(debtor)}</h4>
                           <p className="text-sm text-gray-500">
                             {debtor.durumTanitici} • {formatCurrency(debtor.borcMiktari)}
                           </p>
