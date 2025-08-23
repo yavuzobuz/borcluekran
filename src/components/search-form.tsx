@@ -15,6 +15,9 @@ export function SearchForm() {
   const [formData, setFormData] = useState({
     name: '',
     durumTanitici: '',
+    sozlesmeHesabi: '',
+    telefon: '',
+    tcKimlik: '',
     minBorc: '',
     maxBorc: ''
   })
@@ -40,6 +43,15 @@ export function SearchForm() {
       if (formData.durumTanitici.trim()) {
         searchParams.set('durumTanitici', formData.durumTanitici.trim())
       }
+      if (formData.sozlesmeHesabi.trim()) {
+        searchParams.set('sozlesmeHesabi', formData.sozlesmeHesabi.trim())
+      }
+      if (formData.telefon.trim()) {
+        searchParams.set('telefon', formData.telefon.trim())
+      }
+      if (formData.tcKimlik.trim()) {
+        searchParams.set('tcKimlik', formData.tcKimlik.trim())
+      }
       if (formData.minBorc.trim()) {
         searchParams.set('minBorc', formData.minBorc.trim())
       }
@@ -61,6 +73,9 @@ export function SearchForm() {
     setFormData({
       name: '',
       durumTanitici: '',
+      sozlesmeHesabi: '',
+      telefon: '',
+      tcKimlik: '',
       minBorc: '',
       maxBorc: ''
     })
@@ -99,6 +114,41 @@ export function SearchForm() {
                 placeholder="DT numarası girin..."
                 value={formData.durumTanitici}
                 onChange={(e) => handleInputChange('durumTanitici', e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="sozlesmeHesabi">Sözleşme Hesabı</Label>
+              <Input
+                id="sozlesmeHesabi"
+                type="text"
+                placeholder="Sözleşme hesabı girin..."
+                value={formData.sozlesmeHesabi}
+                onChange={(e) => handleInputChange('sozlesmeHesabi', e.target.value)}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="telefon">Telefon</Label>
+              <Input
+                id="telefon"
+                type="text"
+                placeholder="Telefon numarası girin..."
+                value={formData.telefon}
+                onChange={(e) => handleInputChange('telefon', e.target.value)}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="tcKimlik">TC Kimlik No</Label>
+              <Input
+                id="tcKimlik"
+                type="text"
+                placeholder="TC kimlik numarası girin..."
+                value={formData.tcKimlik}
+                onChange={(e) => handleInputChange('tcKimlik', e.target.value)}
               />
             </div>
           </div>

@@ -22,6 +22,7 @@ interface Debtor {
   adresBilgileri?: string              // Adres Bilgileri
   il?: string                          // İl
   ilce?: string                        // İlçe
+  telefon?: string                     // Telefon
   telefon1?: string                    // Telefon (1. sıradaki)
   telefon2?: string                    // Telefon (2. sıradaki)
   aboneGrubu?: string                  // Abone Grubu
@@ -65,6 +66,33 @@ export function RecentDebtors() {
   const [debtors, setDebtors] = useState<Debtor[]>([])
   const [todayCount, setTodayCount] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
+  const [paymentPromises, setPaymentPromises] = useState<{[key: string]: boolean}>({})
+
+  // Ödeme sözü kontrolü fonksiyonu
+  const checkPaymentPromises = async (debtorsList: Debtor[]) => {
+    try {
+      const promises: {[key: string]: boolean} = {}
+      
+      // Her borçlu için ödeme sözü kontrolü yap
+      for (const debtor of debtorsList) {
+        try {
+          const response = await fetch(`/api/odeme-sozleri/${debtor.durumTanitici}`)
+          if (response.ok) {
+            const data = await response.json()
+            promises[debtor.durumTanitici] = data.odeme_sozleri && data.odeme_sozleri.length > 0
+          } else {
+            promises[debtor.durumTanitici] = false
+          }
+        } catch (error) {
+          promises[debtor.durumTanitici] = false
+        }
+      }
+      
+      setPaymentPromises(promises)
+    } catch (error) {
+      console.error('Ödeme sözü kontrolü hatası:', error)
+    }
+  }
 
   useEffect(() => {
     const fetchRecentDebtors = async () => {
@@ -72,8 +100,11 @@ export function RecentDebtors() {
         const response = await fetch('/api/recent-debtors')
         if (response.ok) {
           const result = await response.json()
-          setDebtors(result.data || [])
+          const debtorsList = result.data || []
+          setDebtors(debtorsList)
           setTodayCount(result.todayCount || 0)
+          // Ödeme sözü kontrolü yap
+          checkPaymentPromises(debtorsList)
         } else {
           console.error('Recent debtors API error:', response.statusText)
           setDebtors([])
@@ -169,19 +200,52 @@ export function RecentDebtors() {
               <div className="flex-1">
                 <div className="flex items-center space-x-3">
                   <div>
-                    <h4 className="font-medium text-gray-900">
+                    <h4 className="font-semibold text-lg text-gray-900 mb-1">
                       {getDisplayName(debtor)}
                     </h4>
-                    <p className="text-sm text-gray-500">
-                      {debtor.durumTanitici} • {formatCurrency(debtor.guncelBorc || debtor.borcMiktari || 0)}
+                    <p className="text-base font-medium text-blue-700 mb-1">
+                      {debtor.durumTanitici}
                     </p>
-                    <p className="text-xs text-gray-400">
-                      İlgili TCKN: {debtor.ilgiliTCKN}
+                    <p className="text-lg font-bold text-green-700 mb-2">
+                      {formatCurrency(debtor.guncelBorc || debtor.borcMiktari || 0)}
                     </p>
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-600 font-medium">
+                        İlgili TCKN: <span className="font-normal">{debtor.ilgiliTCKN}</span>
+                      </p>
+                      {(debtor.telefon || debtor.telefon1) && (
+                        <p className="text-sm text-gray-600 font-medium">
+                          Telefon: <span className="font-normal">{debtor.telefon || debtor.telefon1}</span>
+                        </p>
+                      )}
+                      {debtor.sozlesmeHesabi && (
+                        <p className="text-sm text-gray-600 font-medium">
+                          Sözleşme Hesabı: <span className="font-normal">{debtor.sozlesmeHesabi}</span>
+                        </p>
+                      )}
+                      {debtor.icraDosyaNumarasi && (
+                        <p className="text-sm text-gray-600 font-medium">
+                          İcra Dosya No: <span className="font-normal">{debtor.icraDosyaNumarasi}</span>
+                        </p>
+                      )}
+                    </div>
+                    {paymentPromises[debtor.durumTanitici] && (
+                      <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
+                        <div className="flex items-center space-x-2">
+                          <Calendar className="w-4 h-4 text-red-600" />
+                          <span className="text-sm text-red-700 font-semibold">
+                            Ödeme Taahhüdü Mevcut
+                          </span>
+                        </div>
+                        <p className="text-xs text-red-600 mt-1">
+                          Bu borçlu için aktif ödeme sözü bulunmaktadır.
+                        </p>
+                      </div>
+                    )}
                     {debtor.sonOdemeTarihi && (
-                      <div className="flex items-center space-x-1 mt-1">
-                        <Calendar className="w-3 h-3 text-gray-400" />
-                        <span className="text-xs text-gray-500">
+                      <div className="flex items-center space-x-2 mt-2 p-2 bg-blue-50 rounded-md">
+                        <Calendar className="w-4 h-4 text-blue-600" />
+                        <span className="text-sm text-blue-700 font-medium">
                           Son Ödeme: {formatDate(debtor.sonOdemeTarihi)}
                         </span>
                       </div>
@@ -198,9 +262,13 @@ export function RecentDebtors() {
                   {debtor.odemeDurumu || debtor.durum || 'Bilinmiyor'}
                 </span>
                 <Link href={`/borclu/${debtor.durumTanitici}`}>
-                  <Button variant="outline" size="sm">
+                  <Button 
+                    variant="default" 
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-md"
+                  >
                     <Eye className="w-4 h-4 mr-1" />
-                    Detay
+                    Detay Görüntüle
                   </Button>
                 </Link>
               </div>

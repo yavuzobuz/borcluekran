@@ -147,12 +147,12 @@ export function TodaysPaymentPromises() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Clock className="w-5 h-5" />
-            <span>Bugünkü Ödeme Sözleri</span>
+          <div className="flex items-center space-x-3">
+            <Clock className="w-6 h-6 text-blue-600" />
+            <span className="text-xl font-bold text-gray-900">Bugünkü Ödeme Sözleri</span>
           </div>
-          <div className="flex items-center space-x-1 text-sm text-blue-600">
-            <Calendar className="w-4 h-4" />
+          <div className="flex items-center space-x-2 text-base text-blue-700 font-medium">
+            <Calendar className="w-5 h-5" />
             <span>{currentDate}</span>
           </div>
         </CardTitle>
@@ -169,28 +169,36 @@ export function TodaysPaymentPromises() {
             {paymentPromises.map((promise) => (
               <div
                 key={promise.id}
-                className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors border-l-4 border-l-blue-500"
+                className="flex items-center justify-between p-5 border rounded-lg hover:bg-gray-50 transition-colors border-l-4 border-l-blue-500 shadow-sm"
               >
                 <div className="flex-1">
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-4">
                     <div>
-                      <h4 className="font-medium text-gray-900">
+                      <h4 className="font-bold text-lg text-gray-900">
                         {getDisplayName(promise.borclu)}
                       </h4>
-                      <p className="text-sm text-gray-500">
-                        {promise.borclu.durumTanitici} • {formatCurrency(promise.borclu.guncelBorc || 0)}
+                      <p className="text-base text-blue-700 font-semibold mb-1">
+                        {promise.borclu.durumTanitici}
                       </p>
-                      <p className="text-xs text-gray-400 mt-1">
+                      <p className="text-lg text-green-700 font-bold mb-1">
+                        {formatCurrency(promise.borclu.guncelBorc || 0)}
+                      </p>
+                      {promise.borclu.telefon && (
+                        <p className="text-sm text-gray-600 font-medium mb-1">
+                          Telefon: <span className="font-normal">{promise.borclu.telefon}</span>
+                        </p>
+                      )}
+                      <p className="text-sm text-gray-600 mt-1 font-medium">
                         {promise.aciklama}
                       </p>
                       {promise.odemeMiktari && (
-                        <p className="text-xs text-green-600 font-medium mt-1">
+                        <p className="text-sm text-green-700 font-semibold mt-2 bg-green-50 px-2 py-1 rounded">
                           Söz Verilen: {formatCurrency(promise.odemeMiktari)}
                         </p>
                       )}
-                      <div className="flex items-center space-x-1 mt-1">
-                        <Clock className="w-3 h-3 text-gray-400" />
-                        <span className="text-xs text-gray-500">
+                      <div className="flex items-center space-x-2 mt-2">
+                        <Clock className="w-4 h-4 text-blue-600" />
+                        <span className="text-sm text-blue-700 font-medium">
                           Saat: {formatTime(promise.tarih)}
                         </span>
                       </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -63,7 +64,9 @@ interface Borclu {
 }
 
 export default function BorclularPage() {
+  const searchParams = useSearchParams()
   const [borclular, setBorclular] = useState<Borclu[]>([])
+  const [paymentPromises, setPaymentPromises] = useState<{[key: string]: boolean}>({})
   const [filteredBorclular, setFilteredBorclular] = useState<Borclu[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
@@ -74,6 +77,17 @@ export default function BorclularPage() {
     geciken: 0,
     toplamBorc: 0
   })
+
+  // URL parametrelerini oku
+  const urlParams = {
+    name: searchParams.get('name') || '',
+    durumTanitici: searchParams.get('durumTanitici') || '',
+    sozlesmeHesabi: searchParams.get('sozlesmeHesabi') || '',
+    telefon: searchParams.get('telefon') || '',
+    tcKimlik: searchParams.get('tcKimlik') || '',
+    minBorc: searchParams.get('minBorc') || '',
+    maxBorc: searchParams.get('maxBorc') || ''
+  }
 
   // Adres bilgilerini kontrol eden fonksiyon
   const isAddressLike = (text: string): boolean => {
@@ -207,7 +221,7 @@ export default function BorclularPage() {
 
   useEffect(() => {
     fetchBorclular()
-  }, [])
+  }, [urlParams.name, urlParams.durumTanitici, urlParams.minBorc, urlParams.maxBorc, urlParams.telefon, urlParams.tcKimlik])
 
   useEffect(() => {
     const filtered = borclular.filter(borclu => 
@@ -221,6 +235,10 @@ export default function BorclularPage() {
       (borclu.icraDosyaNumarasi?.includes(searchTerm) || false)
     )
     setFilteredBorclular(filtered)
+    // Filtrelenmiş borçlular için ödeme sözü kontrolü yap
+    if (filtered.length > 0) {
+      checkPaymentPromises(filtered)
+    }
   }, [searchTerm, borclular])
 
   const fetchBorclular = async () => {
@@ -238,8 +256,35 @@ export default function BorclularPage() {
         })
       }
       
-      // Sonra borçlu listesini al (sadece görüntüleme için)
-      const response = await fetch('/api/search?q=&limit=1000')
+      // URL parametrelerini API çağrısında kullan - tüm kayıtları getir
+      const queryParams = new URLSearchParams({
+        limit: '10000'
+      })
+      
+      if (urlParams.name) {
+        queryParams.set('isim', urlParams.name)
+      }
+      if (urlParams.durumTanitici) {
+        queryParams.set('durumTanitici', urlParams.durumTanitici)
+      }
+      if (urlParams.minBorc) {
+        queryParams.set('minBorcMiktari', urlParams.minBorc)
+      }
+      if (urlParams.maxBorc) {
+        queryParams.set('maxBorcMiktari', urlParams.maxBorc)
+      }
+      if (urlParams.telefon) {
+        queryParams.set('telefon', urlParams.telefon)
+      }
+      if (urlParams.sozlesmeHesabi) {
+        queryParams.set('sozlesmeHesabi', urlParams.sozlesmeHesabi)
+      }
+      if (urlParams.tcKimlik) {
+        queryParams.set('tcKimlik', urlParams.tcKimlik)
+      }
+      
+      // Sonra borçlu listesini al
+      const response = await fetch(`/api/search?${queryParams.toString()}`)
       if (response.ok) {
         const data = await response.json()
         const raw: Borclu[] = Array.isArray(data.data) ? data.data : []
@@ -276,12 +321,40 @@ export default function BorclularPage() {
         })
         
         setBorclular(list)
+        // Ödeme sözü kontrolü yap
+        checkPaymentPromises(list)
         // İstatistikler zaten stats API'den alındı, tekrar hesaplama
       }
     } catch (error) {
       console.error('Borçlular yüklenirken hata:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Ödeme sözü kontrolü fonksiyonu
+  const checkPaymentPromises = async (borclularList: Borclu[]) => {
+    try {
+      const promises: {[key: string]: boolean} = {}
+      
+      // Her borçlu için ödeme sözü kontrolü yap
+      for (const borclu of borclularList) {
+        try {
+          const response = await fetch(`/api/odeme-sozleri/${borclu.durumTanitici}`)
+          if (response.ok) {
+            const data = await response.json()
+            promises[borclu.durumTanitici] = data.odeme_sozleri && data.odeme_sozleri.length > 0
+          } else {
+            promises[borclu.durumTanitici] = false
+          }
+        } catch (error) {
+          promises[borclu.durumTanitici] = false
+        }
+      }
+      
+      setPaymentPromises(promises)
+    } catch (error) {
+      console.error('Ödeme sözü kontrolü hatası:', error)
     }
   }
 
@@ -432,51 +505,67 @@ export default function BorclularPage() {
             <Card key={borclu.id} className="p-4 hover:shadow-md transition-shadow border-l-4 border-l-blue-500">
               <div className="flex justify-between items-start mb-4">
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="font-bold text-lg text-primary">
+                  <div className="flex items-center gap-3 mb-3">
+                    <h3 className="font-bold text-xl text-gray-900">
                       {composeName(borclu)}
                     </h3>
-                    <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                    <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-full">
                       {borclu.durumTanitici}
                     </span>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">
-                      <span className="font-medium">İlgili TCKN:</span> {borclu.ilgiliTCKN || borclu.tcKimlikNo || 'Belirtilmemiş'}
+                  <div className="space-y-2">
+                    <p className="text-base text-gray-700">
+                      <span className="font-semibold text-gray-900">İlgili TCKN:</span> <span className="font-medium">{borclu.ilgiliTCKN || borclu.tcKimlikNo || 'Belirtilmemiş'}</span>
                     </p>
                     {borclu.il && (
-                      <p className="text-sm text-muted-foreground">
-                        <span className="font-medium">İl:</span> {borclu.il}
+                      <p className="text-base text-gray-700">
+                        <span className="font-semibold text-gray-900">İl:</span> <span className="font-medium">{borclu.il}</span>
                       </p>
                     )}
                     {borclu.telefon && (
-                      <p className="text-sm text-muted-foreground">
-                        <span className="font-medium">Telefon:</span> {borclu.telefon}
+                      <p className="text-base text-gray-700">
+                        <span className="font-semibold text-gray-900">Telefon:</span> <span className="font-medium">{borclu.telefon}</span>
                       </p>
+                    )}
+                    {borclu.icraDosyaNumarasi && (
+                      <p className="text-base text-gray-700">
+                        <span className="font-semibold text-gray-900">İcra Dosya:</span> <span className="font-medium">{borclu.icraDosyaNumarasi}</span>
+                      </p>
+                    )}
+                    {borclu.sozlesmeHesabi && (
+                      <p className="text-base text-gray-700">
+                        <span className="font-semibold text-gray-900">Sözleşme Hesabı:</span> <span className="font-medium">{borclu.sozlesmeHesabi}</span>
+                      </p>
+                    )}
+                    {paymentPromises[borclu.durumTanitici] && (
+                      <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <p className="text-base text-red-700 font-semibold flex items-center">
+                          <Calendar className="w-5 h-5 mr-2" />
+                          Ödeme Taahhüdü Mevcut
+                        </p>
+                        <p className="text-sm text-red-600 mt-1 font-medium">
+                          Bu borçlu için aktif ödeme sözü bulunmaktadır.
+                        </p>
+                      </div>
                     )}
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="bg-green-50 p-3 rounded-lg">
-                    <p className="text-xl font-bold text-green-700">
+                  <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                    <p className="text-2xl font-bold text-green-800">
                       ₺{(borclu.guncelBorc || borclu.borcMiktari || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                     </p>
-                    <p className="text-xs text-green-600 font-medium">Güncel Borç</p>
+                    <p className="text-sm text-green-700 font-semibold">Güncel Borç</p>
                   </div>
                 </div>
               </div>
 
-              <div className="flex justify-between items-center pt-3 border-t">
-                <div className="text-xs text-muted-foreground">
-                  {borclu.icraDosyaNumarasi && (
-                    <span>İcra Dosya: {borclu.icraDosyaNumarasi}</span>
-                  )}
-                </div>
+              <div className="flex justify-end items-center pt-3 border-t">
                 <Link href={`/borclular/${borclu.id}`}>
                   <Button 
-                    variant="outline" 
+                    variant="default" 
                     size="sm"
-                    className="hover:bg-blue-50 hover:text-blue-700"
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-md px-4"
                   >
                     Detay Görüntüle
                   </Button>

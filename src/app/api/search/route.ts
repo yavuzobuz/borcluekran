@@ -5,9 +5,12 @@ import { z } from 'zod'
 const searchSchema = z.object({
   isim: z.string().optional(),
   durumTanitici: z.string().optional(),
+  sozlesmeHesabi: z.string().optional(),
   minBorcMiktari: z.string().optional(),
   maxBorcMiktari: z.string().optional(),
   durum: z.string().optional(),
+  telefon: z.string().optional(),
+  tcKimlik: z.string().optional(),
   page: z.number().default(1),
   limit: z.number().default(10),
 });
@@ -19,9 +22,12 @@ export async function GET(request: NextRequest) {
     const params = {
       isim: searchParams.get('isim') || undefined,
       durumTanitici: searchParams.get('durumTanitici') || undefined,
+      sozlesmeHesabi: searchParams.get('sozlesmeHesabi') || undefined,
       minBorcMiktari: searchParams.get('minBorcMiktari') || undefined,
       maxBorcMiktari: searchParams.get('maxBorcMiktari') || undefined,
       durum: searchParams.get('durum') || undefined,
+      telefon: searchParams.get('telefon') || undefined,
+      tcKimlik: searchParams.get('tcKimlik') || undefined,
       page: searchParams.get('page') ? Number(searchParams.get('page')) : 1,
       limit: searchParams.get('limit') ? Number(searchParams.get('limit')) : 10,
     };
@@ -36,28 +42,71 @@ export async function GET(request: NextRequest) {
         { ad: { contains: validatedParams.isim, mode: 'insensitive' } },
         { soyad: { contains: validatedParams.isim, mode: 'insensitive' } },
         { muhatapTanimi: { contains: validatedParams.isim, mode: 'insensitive' } },
+        { muhatapTanimiEk: { contains: validatedParams.isim, mode: 'insensitive' } },
+        { durumTanimi: { contains: validatedParams.isim, mode: 'insensitive' } },
       ];
     }
     
     if (validatedParams.durumTanitici) {
-      where.durumTanitici = {
-        contains: validatedParams.durumTanitici,
-        mode: 'insensitive',
-      };
+      where.OR = where.OR || [];
+      where.OR.push(
+        { durumTanitici: { contains: validatedParams.durumTanitici, mode: 'insensitive' } },
+        { icraDosyaNumarasi: { contains: validatedParams.durumTanitici, mode: 'insensitive' } },
+        { sozlesmeHesabi: { contains: validatedParams.durumTanitici, mode: 'insensitive' } }
+      );
+    }
+    
+    if (validatedParams.sozlesmeHesabi) {
+      where.sozlesmeHesabi = { contains: validatedParams.sozlesmeHesabi, mode: 'insensitive' };
     }
     
     if (validatedParams.minBorcMiktari || validatedParams.maxBorcMiktari) {
-      where.borcMiktari = {};
-      if (validatedParams.minBorcMiktari) {
-        where.borcMiktari.gte = Number(validatedParams.minBorcMiktari);
+      where.OR = where.OR || [];
+      const borcConditions = [];
+      
+      // guncelBorc alanında arama
+      if (validatedParams.minBorcMiktari && validatedParams.maxBorcMiktari) {
+        borcConditions.push({
+          guncelBorc: {
+            gte: Number(validatedParams.minBorcMiktari),
+            lte: Number(validatedParams.maxBorcMiktari)
+          }
+        });
+        borcConditions.push({
+          toplamAcikTutar: {
+            gte: Number(validatedParams.minBorcMiktari),
+            lte: Number(validatedParams.maxBorcMiktari)
+          }
+        });
+      } else if (validatedParams.minBorcMiktari) {
+        borcConditions.push({ guncelBorc: { gte: Number(validatedParams.minBorcMiktari) } });
+        borcConditions.push({ toplamAcikTutar: { gte: Number(validatedParams.minBorcMiktari) } });
+      } else if (validatedParams.maxBorcMiktari) {
+        borcConditions.push({ guncelBorc: { lte: Number(validatedParams.maxBorcMiktari) } });
+        borcConditions.push({ toplamAcikTutar: { lte: Number(validatedParams.maxBorcMiktari) } });
       }
-      if (validatedParams.maxBorcMiktari) {
-        where.borcMiktari.lte = Number(validatedParams.maxBorcMiktari);
-      }
+      
+      where.OR.push(...borcConditions);
     }
 
     if (validatedParams.durum && validatedParams.durum !== 'ALL') {
       where.durum = validatedParams.durum;
+    }
+
+    if (validatedParams.telefon) {
+      where.OR = where.OR || [];
+      where.OR.push(
+        { telefon: { contains: validatedParams.telefon, mode: 'insensitive' } },
+        { telefonTesisat: { contains: validatedParams.telefon, mode: 'insensitive' } }
+      );
+    }
+
+    if (validatedParams.tcKimlik) {
+      where.OR = where.OR || [];
+      where.OR.push(
+        { tcKimlikNo: { contains: validatedParams.tcKimlik, mode: 'insensitive' } },
+        { ilgiliTCKN: { contains: validatedParams.tcKimlik, mode: 'insensitive' } }
+      );
     }
 
     const skip = (validatedParams.page - 1) * validatedParams.limit

@@ -117,22 +117,22 @@ export function StatsCards() {
   }
 
   return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-900">İstatistikler</h3>
+    <div className="space-y-5">
+      <h3 className="text-xl font-bold text-gray-900">İstatistikler</h3>
       {cards.map((card, index) => {
         const Icon = card.icon
         return (
-          <Card key={index} className="hover:shadow-md transition-shadow">
+          <Card key={index} className="hover:shadow-lg transition-shadow border-l-4 border-l-blue-500">
             <CardContent className="p-6">
-              <div className="flex items-center space-x-4">
-                <div className={`w-12 h-12 ${card.bgColor} rounded-lg flex items-center justify-center`}>
-                  <Icon className={`w-6 h-6 ${card.color}`} />
+              <div className="flex items-center space-x-5">
+                <div className={`w-14 h-14 ${card.bgColor} rounded-xl flex items-center justify-center shadow-sm`}>
+                  <Icon className={`w-7 h-7 ${card.color}`} />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-600">
+                  <p className="text-base font-semibold text-gray-700 mb-1">
                     {card.title}
                   </p>
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-3xl font-bold text-gray-900">
                     {card.value}
                   </p>
                 </div>

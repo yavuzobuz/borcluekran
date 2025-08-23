@@ -10,11 +10,11 @@ export default function Home() {
       <Header />
       
       <main className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+        <div className="mb-10">
+          <h1 className="text-5xl font-bold text-gray-900 mb-4 leading-tight">
             Borçlu Sorgulama Sistemi
           </h1>
-          <p className="text-lg text-gray-600">
+          <p className="text-xl text-gray-700 font-medium">
             Modern ve güvenli borçlu takip sistemi
           </p>
         </div>
