@@ -118,13 +118,30 @@ export async function GET(request: NextRequest) {
         take: validatedParams.limit,
         orderBy: {
           kayitTarihi: 'desc'
+        },
+        include: {
+          _count: {
+            select: {
+              odemeSozleri: {
+                where: {
+                  durum: 'Aktif'
+                }
+              }
+            }
+          }
         }
       }),
       prisma.borcluBilgileri.count({ where })
     ])
 
+    // Ödeme sözü bilgisini ekle
+    const borclularWithPaymentPromise = borclular.map(borclu => ({
+      ...borclu,
+      hasActivePaymentPromise: borclu._count.odemeSozleri > 0
+    }))
+
     return NextResponse.json({
-      data: borclular,
+      data: borclularWithPaymentPromise,
       total,
       pagination: {
         page: validatedParams.page,

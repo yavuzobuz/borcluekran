@@ -83,20 +83,20 @@ export function SearchForm() {
 
   return (
     <Card className="w-full">
-      <CardHeader>
+      <CardHeader className="pb-3">
         <CardTitle className="flex items-center space-x-2">
-          <Search className="w-5 h-5" />
-          <span>Borçlu Arama</span>
+          <Search className="w-4 h-4" />
+          <span className="text-base">Borçlu Arama</span>
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-sm">
           İsim, durum tanıtıcı veya borç tutarına göre borçlu arayın
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSearch} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">İsim</Label>
+      <CardContent className="p-4">
+        <form onSubmit={handleSearch} className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="name" className="text-sm">İsim</Label>
               <Input
                 id="name"
                 type="text"
@@ -106,8 +106,8 @@ export function SearchForm() {
               />
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="durumTanitici">Durum Tanıtıcı</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="durumTanitici" className="text-sm">Durum Tanıtıcı</Label>
               <Input
                 id="durumTanitici"
                 type="text"
@@ -118,9 +118,9 @@ export function SearchForm() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="sozlesmeHesabi">Sözleşme Hesabı</Label>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="sozlesmeHesabi" className="text-sm">Sözleşme Hesabı</Label>
               <Input
                 id="sozlesmeHesabi"
                 type="text"
@@ -130,8 +130,8 @@ export function SearchForm() {
               />
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="telefon">Telefon</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="telefon" className="text-sm">Telefon</Label>
               <Input
                 id="telefon"
                 type="text"
@@ -141,8 +141,8 @@ export function SearchForm() {
               />
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="tcKimlik">TC Kimlik No</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="tcKimlik" className="text-sm">TC Kimlik No</Label>
               <Input
                 id="tcKimlik"
                 type="text"
@@ -153,9 +153,9 @@ export function SearchForm() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="minBorc">Minimum Borç (TL)</Label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="minBorc" className="text-sm">Minimum Borç (TL)</Label>
               <Input
                 id="minBorc"
                 type="number"
@@ -167,8 +167,8 @@ export function SearchForm() {
               />
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="maxBorc">Maksimum Borç (TL)</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="maxBorc" className="text-sm">Maksimum Borç (TL)</Label>
               <Input
                 id="maxBorc"
                 type="number"
@@ -181,11 +181,12 @@ export function SearchForm() {
             </div>
           </div>
 
-          <div className="flex space-x-3 pt-4">
+          <div className="flex space-x-2 pt-3">
             <Button 
               type="submit" 
               disabled={isLoading}
-              className="flex-1"
+              className="flex-1 h-9"
+              size="sm"
             >
               {isLoading ? (
                 <>
@@ -205,6 +206,8 @@ export function SearchForm() {
               variant="outline" 
               onClick={handleClear}
               disabled={isLoading}
+              className="h-9"
+              size="sm"
             >
               Temizle
             </Button>

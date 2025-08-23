@@ -39,26 +39,16 @@ export async function GET() {
       }
     })
     
-    // İtirazlı/Problemli durumlar
-    const problematicDebtors = await prisma.borcluBilgileri.count({
-      where: {
-        OR: [
-          { itirazDurumu: { not: null } },
-          { durumTanimi: { contains: 'İtiraz' } },
-          { durumTanimi: { contains: 'Problem' } }
-        ]
-      }
-    })
+
     
     return NextResponse.json({
       totalDebtors,
       totalDebt: totalDebtResult._sum.guncelBorc || 0,
       activeDebtors,
       paidDebtors,
-      problematicDebtors,
       // Eski alanlar (geriye uyumluluk için)
       thisMonthPromises: activeDebtors,
-      overduePromises: problematicDebtors
+      overduePromises: 0
     })
   } catch (error) {
     console.error('Stats API error:', error)

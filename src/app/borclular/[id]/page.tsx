@@ -6,11 +6,19 @@ import { Header } from '@/components/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, User, Phone, MapPin, Calendar, CreditCard, FileText, Plus } from 'lucide-react'
+import { ArrowLeft, User, Phone, MapPin, Calendar, CreditCard, FileText, Plus, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+
+interface OdemeSozu {
+  id: number
+  tarih: string
+  aciklama: string
+  odemeMiktari?: number
+  durum: string
+}
 
 interface BorcluDetay {
   id: number
@@ -53,6 +61,8 @@ interface BorcluDetay {
   tesisatDurumuTanimi?: string
   kayitTarihi: string
   guncellemeTarihi: string
+  odemeSozleri?: OdemeSozu[]
+  hasActivePaymentPromise?: boolean
 }
 
 export default function BorcluDetayPage() {
@@ -199,6 +209,28 @@ export default function BorcluDetayPage() {
             {borclu.durumTanitici}
           </Badge>
         </div>
+
+        {/* Ödeme Sözü Uyarısı */}
+        {borclu.hasActivePaymentPromise && (
+          <div className="mb-6">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center gap-3">
+              <div className="bg-yellow-100 p-2 rounded-lg">
+                <AlertTriangle className="w-5 h-5 text-yellow-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-yellow-800">Ödeme Taahhüdü Mevcut - Takip Edilmeli!</h3>
+                <p className="text-sm text-yellow-700 mt-1">
+                  Bu borçlunun aktif ödeme sözü bulunmaktadır. Ödeme durumunu takip ediniz.
+                </p>
+              </div>
+              <Link href={`/odeme-sozleri?durumTanitici=${borclu?.durumTanitici}`}>
+                <Button variant="outline" size="sm" className="border-yellow-300 text-yellow-700 hover:bg-yellow-100">
+                  Detay
+                </Button>
+              </Link>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Ana Bilgiler */}

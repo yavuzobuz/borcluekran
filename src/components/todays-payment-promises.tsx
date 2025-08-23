@@ -118,22 +118,22 @@ export function TodaysPaymentPromises() {
   if (isLoading) {
     return (
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-2">
           <CardTitle className="flex items-center space-x-2">
-            <Clock className="w-5 h-5" />
-            <span>Bugünkü Ödeme Sözleri</span>
+            <Clock className="w-4 h-4" />
+            <span className="text-base">Bugünkü Ödeme Sözleri</span>
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+        <CardContent className="p-4">
+          <div className="space-y-3">
             {[1, 2, 3].map((i) => (
               <div key={i} className="animate-pulse">
-                <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex items-center justify-between p-3 border rounded-lg">
                   <div className="flex-1">
-                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                    <div className="h-3 bg-gray-200 rounded w-3/4 mb-2"></div>
                     <div className="h-3 bg-gray-200 rounded w-1/2"></div>
                   </div>
-                  <div className="w-20 h-8 bg-gray-200 rounded"></div>
+                  <div className="w-16 h-6 bg-gray-200 rounded"></div>
                 </div>
               </div>
             ))}
@@ -145,67 +145,67 @@ export function TodaysPaymentPromises() {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-2">
         <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Clock className="w-6 h-6 text-blue-600" />
-            <span className="text-xl font-bold text-gray-900">Bugünkü Ödeme Sözleri</span>
+          <div className="flex items-center space-x-2">
+            <Clock className="w-4 h-4 text-blue-600" />
+            <span className="text-base font-bold text-gray-900">Bugünkü Ödeme Sözleri</span>
           </div>
-          <div className="flex items-center space-x-2 text-base text-blue-700 font-medium">
-            <Calendar className="w-5 h-5" />
+          <div className="flex items-center space-x-1 text-sm text-blue-700 font-medium">
+            <Calendar className="w-4 h-4" />
             <span>{currentDate}</span>
           </div>
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-4">
         {paymentPromises.length === 0 ? (
-          <div className="text-center py-8">
-            <Clock className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500 mb-2">Bugün için ödeme sözü bulunmuyor</p>
-            <p className="text-sm text-gray-400">Tarih: {currentDate}</p>
+          <div className="text-center py-6">
+            <Clock className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500 mb-2 text-sm">Bugün için ödeme sözü bulunmuyor</p>
+            <p className="text-xs text-gray-400">Tarih: {currentDate}</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {paymentPromises.map((promise) => (
               <div
                 key={promise.id}
-                className="flex items-center justify-between p-5 border rounded-lg hover:bg-gray-50 transition-colors border-l-4 border-l-blue-500 shadow-sm"
+                className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors border-l-3 border-l-blue-500 shadow-sm"
               >
                 <div className="flex-1">
-                  <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-3">
                     <div>
-                      <h4 className="font-bold text-lg text-gray-900">
+                      <h4 className="font-bold text-sm text-gray-900">
                         {getDisplayName(promise.borclu)}
                       </h4>
-                      <p className="text-base text-blue-700 font-semibold mb-1">
+                      <p className="text-xs text-blue-700 font-semibold mb-1">
                         {promise.borclu.durumTanitici}
                       </p>
-                      <p className="text-lg text-green-700 font-bold mb-1">
+                      <p className="text-sm text-green-700 font-bold mb-1">
                         {formatCurrency(promise.borclu.guncelBorc || 0)}
                       </p>
                       {promise.borclu.telefon && (
-                        <p className="text-sm text-gray-600 font-medium mb-1">
+                        <p className="text-xs text-gray-600 font-medium mb-1">
                           Telefon: <span className="font-normal">{promise.borclu.telefon}</span>
                         </p>
                       )}
-                      <p className="text-sm text-gray-600 mt-1 font-medium">
+                      <p className="text-xs text-gray-600 mt-1 font-medium">
                         {promise.aciklama}
                       </p>
                       {promise.odemeMiktari && (
-                        <p className="text-sm text-green-700 font-semibold mt-2 bg-green-50 px-2 py-1 rounded">
+                        <p className="text-xs text-green-700 font-semibold mt-1 bg-green-50 px-2 py-1 rounded">
                           Söz Verilen: {formatCurrency(promise.odemeMiktari)}
                         </p>
                       )}
-                      <div className="flex items-center space-x-2 mt-2">
-                        <Clock className="w-4 h-4 text-blue-600" />
-                        <span className="text-sm text-blue-700 font-medium">
+                      <div className="flex items-center space-x-1 mt-1">
+                        <Clock className="w-3 h-3 text-blue-600" />
+                        <span className="text-xs text-blue-700 font-medium">
                           Saat: {formatTime(promise.tarih)}
                         </span>
                       </div>
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2">
                   <span
                     className={`px-2 py-1 text-xs font-medium rounded-full ${
                       getStatusColor(promise.borclu.odemeDurumu || 'Bilinmiyor')
@@ -215,7 +215,7 @@ export function TodaysPaymentPromises() {
                   </span>
                   <Link href={`/borclu/${promise.borclu.durumTanitici}`}>
                     <Button variant="outline" size="sm">
-                      <Eye className="w-4 h-4 mr-1" />
+                      <Eye className="w-3 h-3 mr-1" />
                       Detay
                     </Button>
                   </Link>
@@ -226,9 +226,9 @@ export function TodaysPaymentPromises() {
         )}
         
         {paymentPromises.length > 0 && (
-          <div className="mt-6 text-center">
+          <div className="mt-4 text-center">
             <Link href="/odeme-sozleri">
-              <Button variant="outline" className="w-full">
+              <Button variant="outline" size="sm" className="w-full">
                 Tüm Ödeme Sözlerini Görüntüle
               </Button>
             </Link>

@@ -59,6 +59,7 @@ interface Debtor {
   borcMiktari?: number
   sonOdemeTarihi?: string
   durum?: string
+  hasActivePaymentPromise?: boolean    // Aktif ödeme sözü durumu
 }
 
 export function RecentDebtors() {
@@ -123,13 +124,7 @@ export function RecentDebtors() {
     }
   }
 
-  // Ödeme taahhüdü durumları
-  const paymentPromises: { [key: string]: boolean } = {
-    '21726028': true,
-    '21726029': false,
-    '21726030': true,
-    '21796028': true,  // Resimde görünen durum tanıcısı için eklendi
-  }
+  // Ödeme taahhüdü durumları artık API'den gelen hasActivePaymentPromise ile kontrol ediliyor
 
   if (loading) {
     return (
@@ -144,14 +139,14 @@ export function RecentDebtors() {
             </div>
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-6">
-          <div className="space-y-4">
+        <CardContent className="p-4">
+          <div className="space-y-3">
             {[...Array(3)].map((_, index) => (
               <div key={index} className="animate-pulse">
-                <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
                   <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                    <div className="h-3 bg-gray-200 rounded w-3/4"></div>
                     <div className="h-3 bg-gray-200 rounded w-1/2"></div>
                   </div>
                   <div className="h-8 bg-gray-200 rounded w-16"></div>
@@ -177,10 +172,10 @@ export function RecentDebtors() {
             </div>
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-6">
-          <div className="text-center py-8">
-            <p className="text-red-600 mb-4">{error}</p>
-            <Button onClick={fetchDebtors} variant="outline">
+        <CardContent className="p-4">
+          <div className="text-center py-6">
+            <p className="text-red-600 mb-3">{error}</p>
+            <Button onClick={fetchDebtors} variant="outline" size="sm">
               Tekrar Dene
             </Button>
           </div>
@@ -202,8 +197,8 @@ export function RecentDebtors() {
             </div>
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-6">
-          <div className="text-center py-8">
+        <CardContent className="p-4">
+          <div className="text-center py-6">
             <p className="text-gray-500">Henüz borçlu kaydı bulunmuyor.</p>
           </div>
         </CardContent>
@@ -229,32 +224,32 @@ export function RecentDebtors() {
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-6">
-        <div className="space-y-4">
+      <CardContent className="p-4">
+        <div className="space-y-3">
           {debtors.map((debtor, index) => (
             <div
               key={debtor.durumTanitici}
-              className="group relative bg-white border border-slate-200 rounded-lg p-4 hover:shadow-lg hover:border-blue-300 transition-all duration-300"
+              className="group relative bg-white border border-slate-200 rounded-lg p-3 hover:shadow-md hover:border-blue-300 transition-all duration-300"
             >
               {/* Renk çubuğu - Tüm kartlar aynı mavi renk */}
               <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl bg-gradient-to-b from-blue-500 to-blue-600"></div>
               
-              <div className="ml-4 flex-1 min-w-0">
+              <div className="ml-3 flex-1 min-w-0">
                 {/* Üst kısım - İsim ve temel bilgiler */}
-                <div className="mb-3">
-                  <h3 className="font-semibold text-gray-900 text-base group-hover:text-blue-700 transition-colors truncate">
+                <div className="mb-2">
+                  <h3 className="font-semibold text-gray-900 text-sm group-hover:text-blue-700 transition-colors truncate">
                     {getDisplayName(debtor)}
                   </h3>
                   <p className="text-xs font-medium text-blue-700 mb-1 truncate">
                     <span className="text-gray-600">Durum Tanıcı:</span> {debtor.durumTanitici}
                   </p>
-                  <p className="text-lg font-bold text-green-700 mb-3">
+                  <p className="text-base font-bold text-green-700 mb-2">
                     {formatCurrency(debtor.guncelBorc || debtor.borcMiktari || 0)}
                   </p>
                 </div>
                 
                 {/* Orta kısım - Detay bilgileri - Tüm yazılar mavi renkte */}
-                <div className="space-y-2 mb-3">
+                <div className="space-y-1 mb-2">
                   <div className="flex items-center space-x-1 bg-blue-50 px-2 py-1 rounded-md">
                     <div className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0"></div>
                     <span className="text-xs font-medium text-blue-700 flex-shrink-0">TCKN:</span>
@@ -286,9 +281,9 @@ export function RecentDebtors() {
                 )}
                 
                 {/* Alt kısım - Durum ve Detay butonu */}
-                <div className="flex justify-between items-center mt-4 pt-3 border-t border-gray-100">
+                <div className="flex justify-between items-center mt-3 pt-2 border-t border-gray-100">
                   {(debtor.odemeDurumu || debtor.durum) && (
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                       (debtor.odemeDurumu || debtor.durum) === 'Ödendi' 
                         ? 'bg-green-100 text-green-800' 
                         : 'bg-yellow-100 text-yellow-800'
@@ -300,7 +295,7 @@ export function RecentDebtors() {
                     <Button 
                       variant="default" 
                       size="sm"
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-4 py-2 shadow-md hover:shadow-lg transition-all duration-200"
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-3 py-1 shadow-sm hover:shadow-md transition-all duration-200"
                     >
                       <Eye className="w-3 h-3 mr-1" />
                       Detay
@@ -308,13 +303,13 @@ export function RecentDebtors() {
                   </Link>
                 </div>
                 
-                {paymentPromises[debtor.durumTanitici] && (
-                  <div className="mt-3 p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-lg shadow-sm animate-pulse">
-                    <div className="flex items-center space-x-2">
-                      <div className="p-1 bg-amber-500 rounded-full">
-                        <Calendar className="w-3 h-3 text-white" />
+                {debtor.hasActivePaymentPromise && (
+                  <div className="mt-2 p-2 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-md shadow-sm animate-pulse">
+                    <div className="flex items-center space-x-1">
+                      <div className="p-0.5 bg-amber-500 rounded-full">
+                        <Calendar className="w-2 h-2 text-white" />
                       </div>
-                      <span className="text-sm text-amber-800 font-bold">
+                      <span className="text-xs text-amber-800 font-bold">
                         ⚠️ Ödeme Taahhüdü Mevcut - Takip Edilmeli!
                       </span>
                     </div>
@@ -336,13 +331,14 @@ export function RecentDebtors() {
             </div>
           ))}
         </div>
-        <div className="mt-8 text-center">
+        <div className="mt-4 text-center">
           <Link href="/borclular">
             <Button 
               variant="outline" 
-              className="w-full bg-gradient-to-r from-slate-50 to-slate-100 border-2 border-slate-300 hover:from-blue-50 hover:to-blue-100 hover:border-blue-400 text-slate-700 hover:text-blue-700 font-semibold py-3 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02]"
+              size="sm"
+              className="w-full bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-300 hover:from-blue-50 hover:to-blue-100 hover:border-blue-400 text-slate-700 hover:text-blue-700 font-medium py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-300"
             >
-              <TrendingUp className="w-5 h-5 mr-2" />
+              <TrendingUp className="w-4 h-4 mr-2" />
               Tüm Borçluları Görüntüle
             </Button>
           </Link>

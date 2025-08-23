@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+</head>
+<body>
+    <h1>API Test Sayfası</h1>
+    <div id="results"></div>
+    
+    <script>
+        async function testAPIs() {
+            const results = document.getElementById('results');
+            
+            try {
+                // Stats API test
+                const statsResponse = await fetch('/api/stats');
+                const statsData = await statsResponse.json();
+                results.innerHTML += '<h2>Stats API:</h2><pre>' + JSON.stringify(statsData, null, 2) + '</pre>';
+                
+                // Recent Debtors API test
+                const debtorsResponse = await fetch('/api/recent-debtors');
+                const debtorsData = await debtorsResponse.json();
+                results.innerHTML += '<h2>Recent Debtors API:</h2><pre>' + JSON.stringify(debtorsData, null, 2) + '</pre>';
+                
+                // Payment Promises API test
+                const promisesResponse = await fetch('/api/todays-payment-promises');
+                const promisesData = await promisesResponse.json();
+                results.innerHTML += '<h2>Payment Promises API:</h2><pre>' + JSON.stringify(promisesData, null, 2) + '</pre>';
+                
+            } catch (error) {
+                results.innerHTML += '<h2>Error:</h2><pre>' + error.message + '</pre>';
+            }
+        }
+        
+        testAPIs();
+    </script>
+</body>
+</html>

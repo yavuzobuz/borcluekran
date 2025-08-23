@@ -38,7 +38,22 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(borclu)
+    // Ödeme sözü bilgisini de al
+    const odemeSozleri = await prisma.odemeSozu.findMany({
+      where: {
+        borcluId: borclu.id,
+        durum: 'Aktif'
+      },
+      orderBy: {
+        tarih: 'desc'
+      }
+    })
+
+    return NextResponse.json({
+      ...borclu,
+      odemeSozleri,
+      hasActivePaymentPromise: odemeSozleri.length > 0
+    })
   } catch (error) {
     console.error('Borçlu detayı getirme hatası:', error)
     return NextResponse.json(

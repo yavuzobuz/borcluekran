@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, TrendingUp, Calendar, AlertTriangle } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
+import { Users, TrendingUp, Calendar } from 'lucide-react'
 
 interface Stats {
   totalDebtors: number
@@ -84,28 +84,21 @@ export function StatsCards() {
       icon: Calendar,
       color: 'text-orange-600',
       bgColor: 'bg-orange-100'
-    },
-    {
-      title: 'Problemli Dosyalar',
-      value: (stats as any).problematicDebtors?.toLocaleString('tr-TR') || stats.overduePromises.toString(),
-      icon: AlertTriangle,
-      color: 'text-red-600',
-      bgColor: 'bg-red-100'
     }
   ]
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        {[1, 2, 3, 4].map((i) => (
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
           <Card key={i}>
-            <CardContent className="p-6">
+            <CardContent className="p-4">
               <div className="animate-pulse">
-                <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 bg-gray-200 rounded-lg"></div>
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gray-200 rounded-lg"></div>
                   <div className="flex-1">
-                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                    <div className="h-6 bg-gray-200 rounded w-1/2"></div>
+                    <div className="h-3 bg-gray-200 rounded w-3/4 mb-2"></div>
+                    <div className="h-5 bg-gray-200 rounded w-1/2"></div>
                   </div>
                 </div>
               </div>
@@ -117,22 +110,22 @@ export function StatsCards() {
   }
 
   return (
-    <div className="space-y-5">
-      <h3 className="text-xl font-bold text-gray-900">İstatistikler</h3>
+    <div className="space-y-3">
+      <h3 className="text-lg font-bold text-gray-900">İstatistikler</h3>
       {cards.map((card, index) => {
         const Icon = card.icon
         return (
-          <Card key={index} className="hover:shadow-lg transition-shadow border-l-4 border-l-blue-500">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-5">
-                <div className={`w-14 h-14 ${card.bgColor} rounded-xl flex items-center justify-center shadow-sm`}>
-                  <Icon className={`w-7 h-7 ${card.color}`} />
+          <Card key={index} className="hover:shadow-md transition-shadow border-l-3 border-l-blue-500">
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-3">
+                <div className={`w-10 h-10 ${card.bgColor} rounded-lg flex items-center justify-center shadow-sm`}>
+                  <Icon className={`w-5 h-5 ${card.color}`} />
                 </div>
                 <div className="flex-1">
-                  <p className="text-base font-semibold text-gray-700 mb-1">
+                  <p className="text-sm font-semibold text-gray-700 mb-1">
                     {card.title}
                   </p>
-                  <p className="text-3xl font-bold text-gray-900">
+                  <p className="text-xl font-bold text-gray-900">
                     {card.value}
                   </p>
                 </div>

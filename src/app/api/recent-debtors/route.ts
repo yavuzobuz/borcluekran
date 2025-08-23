@@ -39,7 +39,12 @@ export async function GET() {
         telefon: true,
         icraDosyaNumarasi: true,
         borcluTipiTanimi: true,
-        kayitTarihi: true
+        kayitTarihi: true,
+        odemeSozleri: {
+          select: {
+            id: true
+          }
+        }
       }
     })
 
@@ -73,14 +78,25 @@ export async function GET() {
           telefon: true,
           icraDosyaNumarasi: true,
           borcluTipiTanimi: true,
-          kayitTarihi: true
+          kayitTarihi: true,
+          odemeSozleri: {
+             select: {
+               id: true
+             }
+           }
         }
       })
       recentDebtors = [...todayDebtors, ...additionalDebtors]
     }
     
+    // Ödeme sözü bilgisini ekle
+    const recentDebtorsWithPaymentPromise = recentDebtors.map(borclu => ({
+      ...borclu,
+      hasActivePaymentPromise: borclu.odemeSozleri.length > 0
+    }))
+    
     return NextResponse.json({
-      data: recentDebtors,
+      data: recentDebtorsWithPaymentPromise,
       todayCount: todayDebtors.length,
       totalCount: recentDebtors.length
     })
