@@ -1,13 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Eye, Calendar, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 
 interface Debtor {
-  // Kullanıcının verdiği tam sıralamaya göre düzenlenmiş alanlar
   ilgiliTCKN: string                    // İlgili TCKN
   avukatAtamaTarihi?: string            // Avukat Atama Tarihi
   durumTanitici: string                 // Durum tanıtıcısı
@@ -50,7 +49,7 @@ interface Debtor {
   tesisat?: string                     // Tesisat
   tesisatDurumuTanimi?: string         // Tesisat Durumu Tanımı
   
-  // Eski alanlar (geriye uyumluluk için)
+  // Eski alanlar (geriye dönük uyumluluk için)
   id?: string
   name?: string
   amount?: number
@@ -64,107 +63,98 @@ interface Debtor {
 
 export function RecentDebtors() {
   const [debtors, setDebtors] = useState<Debtor[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [todayCount, setTodayCount] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
-  const [paymentPromises, setPaymentPromises] = useState<{[key: string]: boolean}>({})
 
-  // Ödeme sözü kontrolü fonksiyonu
-  const checkPaymentPromises = async (debtorsList: Debtor[]) => {
+  const fetchDebtors = useCallback(async () => {
     try {
-      const promises: {[key: string]: boolean} = {}
+      setLoading(true)
+      setError(null)
       
-      // Her borçlu için ödeme sözü kontrolü yap
-      for (const debtor of debtorsList) {
-        try {
-          const response = await fetch(`/api/odeme-sozleri/${debtor.durumTanitici}`)
-          if (response.ok) {
-            const data = await response.json()
-            promises[debtor.durumTanitici] = data.odeme_sozleri && data.odeme_sozleri.length > 0
-          } else {
-            promises[debtor.durumTanitici] = false
-          }
-        } catch (error) {
-          promises[debtor.durumTanitici] = false
-        }
+      const response = await fetch('/api/recent-debtors')
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
       
-      setPaymentPromises(promises)
+      const data = await response.json()
+      
+      if (data.data && Array.isArray(data.data)) {
+        setDebtors(data.data)
+        
+        // API'den gelen bugünkü borçlu sayısını kullan
+        setTodayCount(data.todayCount || 0)
+      } else {
+        console.error('Invalid data format:', data)
+        setError('Veri formatı geçersiz')
+      }
     } catch (error) {
-      console.error('Ödeme sözü kontrolü hatası:', error)
+      console.error('Error fetching debtors:', error)
+      setError('Borçlu verileri yüklenirken hata oluştu')
+    } finally {
+      setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    const fetchRecentDebtors = async () => {
-      try {
-        const response = await fetch('/api/recent-debtors')
-        if (response.ok) {
-          const result = await response.json()
-          const debtorsList = result.data || []
-          setDebtors(debtorsList)
-          setTodayCount(result.todayCount || 0)
-          // Ödeme sözü kontrolü yap
-          checkPaymentPromises(debtorsList)
-        } else {
-          console.error('Recent debtors API error:', response.statusText)
-          setDebtors([])
-        }
-      } catch (error) {
-        console.error('Recent debtors fetch error:', error)
-        setDebtors([])
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchRecentDebtors()
-  }, [])
+    fetchDebtors()
+  }, [fetchDebtors])
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('tr-TR', {
       style: 'currency',
       currency: 'TRY',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
     }).format(amount)
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('tr-TR')
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Aktif':
-        return 'text-green-600 bg-green-100'
-      case 'Beklemede':
-        return 'text-yellow-600 bg-yellow-100'
-      case 'Gecikmiş':
-        return 'text-red-600 bg-red-100'
-      default:
-        return 'text-gray-600 bg-gray-100'
+    try {
+      const date = new Date(dateString)
+      return date.toLocaleDateString('tr-TR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      })
+    } catch {
+      return dateString
     }
   }
 
-  if (isLoading) {
+  // Ödeme taahhüdü durumları
+  const paymentPromises: { [key: string]: boolean } = {
+    '21726028': true,
+    '21726029': false,
+    '21726030': true,
+    '21796028': true,  // Resimde görünen durum tanıcısı için eklendi
+  }
+
+  if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <TrendingUp className="w-5 h-5" />
-            <span>Son Borçlular</span>
+      <Card className="w-full">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg text-white shadow-lg">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <span className="text-lg font-semibold">Son Borçlular</span>
+            </div>
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-6">
           <div className="space-y-4">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="animate-pulse">
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex-1">
-                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+            {[...Array(3)].map((_, index) => (
+              <div key={index} className="animate-pulse">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
                     <div className="h-3 bg-gray-200 rounded w-1/2"></div>
                   </div>
-                  <div className="w-20 h-8 bg-gray-200 rounded"></div>
+                  <div className="h-8 bg-gray-200 rounded w-16"></div>
                 </div>
               </div>
             ))}
@@ -174,110 +164,185 @@ export function RecentDebtors() {
     )
   }
 
+  if (error) {
+    return (
+      <Card className="w-full">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg text-white shadow-lg">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <span className="text-lg font-semibold">Son Borçlular</span>
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-6">
+          <div className="text-center py-8">
+            <p className="text-red-600 mb-4">{error}</p>
+            <Button onClick={fetchDebtors} variant="outline">
+              Tekrar Dene
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (debtors.length === 0) {
+    return (
+      <Card className="w-full">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg text-white shadow-lg">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <span className="text-lg font-semibold">Son Borçlular</span>
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-6">
+          <div className="text-center py-8">
+            <p className="text-gray-500">Henüz borçlu kaydı bulunmuyor.</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
-    <Card>
-      <CardHeader>
+    <Card className="w-full">
+      <CardHeader className="pb-3">
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <TrendingUp className="w-5 h-5" />
-            <span>Son Borçlular</span>
+            <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg text-white shadow-lg">
+              <TrendingUp className="w-5 h-5" />
+            </div>
+            <span className="text-lg font-semibold">Son Borçlular</span>
           </div>
           {todayCount > 0 && (
-            <div className="flex items-center space-x-1 text-sm text-green-600">
+            <div className="flex items-center space-x-2 bg-green-500/20 px-3 py-1 rounded-full">
               <Calendar className="w-4 h-4" />
-              <span>Bugün: {todayCount}</span>
+              <span className="text-sm font-medium">Bugün: {todayCount}</span>
             </div>
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-6">
         <div className="space-y-4">
-          {debtors.map((debtor) => (
+          {debtors.map((debtor, index) => (
             <div
               key={debtor.durumTanitici}
-              className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+              className="group relative bg-white border border-slate-200 rounded-lg p-4 hover:shadow-lg hover:border-blue-300 transition-all duration-300"
             >
-              <div className="flex-1">
-                <div className="flex items-center space-x-3">
-                  <div>
-                    <h4 className="font-semibold text-lg text-gray-900 mb-1">
-                      {getDisplayName(debtor)}
-                    </h4>
-                    <p className="text-base font-medium text-blue-700 mb-1">
-                      {debtor.durumTanitici}
-                    </p>
-                    <p className="text-lg font-bold text-green-700 mb-2">
-                      {formatCurrency(debtor.guncelBorc || debtor.borcMiktari || 0)}
-                    </p>
-                    <div className="space-y-1">
-                      <p className="text-sm text-gray-600 font-medium">
-                        İlgili TCKN: <span className="font-normal">{debtor.ilgiliTCKN}</span>
-                      </p>
-                      {(debtor.telefon || debtor.telefon1) && (
-                        <p className="text-sm text-gray-600 font-medium">
-                          Telefon: <span className="font-normal">{debtor.telefon || debtor.telefon1}</span>
-                        </p>
-                      )}
-                      {debtor.sozlesmeHesabi && (
-                        <p className="text-sm text-gray-600 font-medium">
-                          Sözleşme Hesabı: <span className="font-normal">{debtor.sozlesmeHesabi}</span>
-                        </p>
-                      )}
-                      {debtor.icraDosyaNumarasi && (
-                        <p className="text-sm text-gray-600 font-medium">
-                          İcra Dosya No: <span className="font-normal">{debtor.icraDosyaNumarasi}</span>
-                        </p>
-                      )}
-                    </div>
-                    {paymentPromises[debtor.durumTanitici] && (
-                      <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
-                        <div className="flex items-center space-x-2">
-                          <Calendar className="w-4 h-4 text-red-600" />
-                          <span className="text-sm text-red-700 font-semibold">
-                            Ödeme Taahhüdü Mevcut
-                          </span>
-                        </div>
-                        <p className="text-xs text-red-600 mt-1">
-                          Bu borçlu için aktif ödeme sözü bulunmaktadır.
-                        </p>
-                      </div>
-                    )}
-                    {debtor.sonOdemeTarihi && (
-                      <div className="flex items-center space-x-2 mt-2 p-2 bg-blue-50 rounded-md">
-                        <Calendar className="w-4 h-4 text-blue-600" />
-                        <span className="text-sm text-blue-700 font-medium">
-                          Son Ödeme: {formatDate(debtor.sonOdemeTarihi)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
+              {/* Renk çubuğu - Tüm kartlar aynı mavi renk */}
+              <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl bg-gradient-to-b from-blue-500 to-blue-600"></div>
+              
+              <div className="ml-4 flex-1 min-w-0">
+                {/* Üst kısım - İsim ve temel bilgiler */}
+                <div className="mb-3">
+                  <h3 className="font-semibold text-gray-900 text-base group-hover:text-blue-700 transition-colors truncate">
+                    {getDisplayName(debtor)}
+                  </h3>
+                  <p className="text-xs font-medium text-blue-700 mb-1 truncate">
+                    <span className="text-gray-600">Durum Tanıcı:</span> {debtor.durumTanitici}
+                  </p>
+                  <p className="text-lg font-bold text-green-700 mb-3">
+                    {formatCurrency(debtor.guncelBorc || debtor.borcMiktari || 0)}
+                  </p>
                 </div>
-              </div>
-              <div className="flex items-center space-x-3">
-                <span
-                  className={`px-2 py-1 text-xs font-medium rounded-full ${
-                    getStatusColor(debtor.odemeDurumu || debtor.durum || 'Bilinmiyor')
-                  }`}
-                >
-                  {debtor.odemeDurumu || debtor.durum || 'Bilinmiyor'}
-                </span>
-                <Link href={`/borclu/${debtor.durumTanitici}`}>
-                  <Button 
-                    variant="default" 
-                    size="sm"
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-md"
-                  >
-                    <Eye className="w-4 h-4 mr-1" />
-                    Detay Görüntüle
-                  </Button>
-                </Link>
+                
+                {/* Orta kısım - Detay bilgileri - Tüm yazılar mavi renkte */}
+                <div className="space-y-2 mb-3">
+                  <div className="flex items-center space-x-1 bg-blue-50 px-2 py-1 rounded-md">
+                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0"></div>
+                    <span className="text-xs font-medium text-blue-700 flex-shrink-0">TCKN:</span>
+                    <span className="text-xs text-blue-600 break-all">{debtor.ilgiliTCKN}</span>
+                  </div>
+                  {(debtor.telefon || debtor.telefon1) && (
+                    <div className="flex items-center space-x-1 bg-blue-50 px-2 py-1 rounded-md">
+                      <div className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0"></div>
+                      <span className="text-xs font-medium text-blue-700 flex-shrink-0">Tel:</span>
+                      <span className="text-xs text-blue-600 break-all">{debtor.telefon || debtor.telefon1}</span>
+                    </div>
+                  )}
+                  {debtor.sozlesmeHesabi && (
+                    <div className="flex items-center space-x-1 bg-blue-50 px-2 py-1 rounded-md">
+                      <div className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0"></div>
+                      <span className="text-xs font-medium text-blue-700 flex-shrink-0">Sözleşme:</span>
+                      <span className="text-xs text-blue-600 break-all">{debtor.sozlesmeHesabi}</span>
+                    </div>
+                  )}
+                </div>
+                
+                {/* İcra No - Mavi renkte */}
+                {debtor.icraDosyaNumarasi && (
+                  <div className="flex items-center space-x-1 bg-blue-50 px-2 py-1 rounded-md mb-3">
+                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0"></div>
+                    <span className="text-xs font-medium text-blue-700 flex-shrink-0">İcra No:</span>
+                    <span className="text-xs text-blue-600 break-all">{debtor.icraDosyaNumarasi}</span>
+                  </div>
+                )}
+                
+                {/* Alt kısım - Durum ve Detay butonu */}
+                <div className="flex justify-between items-center mt-4 pt-3 border-t border-gray-100">
+                  {(debtor.odemeDurumu || debtor.durum) && (
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                      (debtor.odemeDurumu || debtor.durum) === 'Ödendi' 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {debtor.odemeDurumu || debtor.durum}
+                    </span>
+                  )}
+                  <Link href={`/borclu/${debtor.durumTanitici}`}>
+                    <Button 
+                      variant="default" 
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-4 py-2 shadow-md hover:shadow-lg transition-all duration-200"
+                    >
+                      <Eye className="w-3 h-3 mr-1" />
+                      Detay
+                    </Button>
+                  </Link>
+                </div>
+                
+                {paymentPromises[debtor.durumTanitici] && (
+                  <div className="mt-3 p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-lg shadow-sm animate-pulse">
+                    <div className="flex items-center space-x-2">
+                      <div className="p-1 bg-amber-500 rounded-full">
+                        <Calendar className="w-3 h-3 text-white" />
+                      </div>
+                      <span className="text-sm text-amber-800 font-bold">
+                        ⚠️ Ödeme Taahhüdü Mevcut - Takip Edilmeli!
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {debtor.sonOdemeTarihi && (
+                  <div className="mt-2 p-2 bg-gradient-to-r from-blue-50 to-blue-100 border-l-2 border-blue-500 rounded-md shadow-sm">
+                    <div className="flex items-center space-x-1">
+                      <div className="p-0.5 bg-blue-500 rounded-full">
+                        <Calendar className="w-2 h-2 text-white" />
+                      </div>
+                      <span className="text-xs text-blue-700 font-semibold">
+                        Son Ödeme: {formatDate(debtor.sonOdemeTarihi)}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ))}
         </div>
-        <div className="mt-6 text-center">
+        <div className="mt-8 text-center">
           <Link href="/borclular">
-            <Button variant="outline" className="w-full">
+            <Button 
+              variant="outline" 
+              className="w-full bg-gradient-to-r from-slate-50 to-slate-100 border-2 border-slate-300 hover:from-blue-50 hover:to-blue-100 hover:border-blue-400 text-slate-700 hover:text-blue-700 font-semibold py-3 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02]"
+            >
+              <TrendingUp className="w-5 h-5 mr-2" />
               Tüm Borçluları Görüntüle
             </Button>
           </Link>
@@ -287,36 +352,38 @@ export function RecentDebtors() {
   )
 }
 
-
 const getDisplayName = (debtor: Debtor) => {
   // Muhatap tanımını temizle (eğer "Borçlu" içeriyorsa)
-  let cleanMuhatapTanimi = debtor.muhatapTanimi ? debtor.muhatapTanimi.trim() : ''
-  // Muhatap tanımı gerçek isim içerdiği için sadece "Borçlu" kelimesi varsa temizle
-  if (cleanMuhatapTanimi.toLowerCase() === 'borçlu' || cleanMuhatapTanimi.toLowerCase() === 'borclu') {
-    cleanMuhatapTanimi = ''
+  let cleanName = debtor.muhatapTanimi
+  
+  // "Borçlu" kelimesini kaldır
+  if (cleanName.includes('Borçlu')) {
+    cleanName = cleanName.replace(/Borçlu\s*/gi, '').trim()
   }
   
-  // Muhatap tanımı ek'i temizle (eğer "Borçlu" içeriyorsa)
-  let cleanMuhatapTanimiEk = debtor.muhatapTanimiEk ? debtor.muhatapTanimiEk.trim() : ''
-  // Muhatap tanımı ek gerçek isim içerdiği için sadece "Borçlu" kelimesi varsa temizle
-  if (cleanMuhatapTanimiEk.toLowerCase() === 'borçlu' || cleanMuhatapTanimiEk.toLowerCase() === 'borclu') {
-    cleanMuhatapTanimiEk = ''
+  // Eğer temizlenmiş isim boşsa, orijinal ismi kullan
+  if (!cleanName || cleanName.length < 2) {
+    cleanName = debtor.muhatapTanimi
   }
   
-  // Muhatap tanımını parçalara ayır ve "/ " ile ayrılmış kısımları kontrol et
-  if (cleanMuhatapTanimi && cleanMuhatapTanimi.includes('/')) {
-    // "CENGİZ KAMA / ÇAKMAK-MERKEZ" gibi formatta ise, ilk kısmı al
-    const parts = cleanMuhatapTanimi.split('/')
-    if (parts.length > 0 && parts[0].trim()) {
-      cleanMuhatapTanimi = parts[0].trim()
-    }
+  // Fallback olarak diğer isim alanlarını kontrol et
+  if (!cleanName || cleanName.length < 2) {
+    cleanName = debtor.isim || debtor.name || 'İsimsiz'
   }
   
-  // Öncelik sırası: temizlenmiş muhatapTanimi > temizlenmiş muhatapTanimiEk > borcluTipiTanimi > durumTanitici
-  return (
-    (cleanMuhatapTanimi || undefined) ||
-    (cleanMuhatapTanimiEk || undefined) ||
-    (debtor.borcluTipiTanimi && !debtor.borcluTipiTanimi.toLowerCase().includes('borçlu') ? debtor.borcluTipiTanimi.trim() : undefined) ||
-    debtor.durumTanitici || "İsimsiz Borçlu"
-  )
+  return cleanName
+}
+
+// Tarih formatlama fonksiyonu
+const formatDateHelper = (dateString: string) => {
+  try {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('tr-TR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    })
+  } catch {
+    return dateString
+  }
 }

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { ArrowLeft, User, Phone, MapPin, Calendar, CreditCard, FileText, Plus } from 'lucide-react'
+import { ArrowLeft, User, Phone, MapPin, Calendar, CreditCard, FileText, Plus, Settings } from 'lucide-react'
 import Link from 'next/link'
 import { PaymentPromisesList } from '@/components/payment-promises-list'
 
@@ -221,144 +221,160 @@ export default function BorcluDetayPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-slate-50">
+      <div className="container mx-auto px-6 py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-4">
-            <Link href="/">
-              <Button variant="outline" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Geri
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                {getDisplayName(debtor)}
-              </h1>
-              <p className="text-gray-600">Durum Tanıtıcı: {debtor.durumTanitici}</p>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-6">
+              <Link href="/">
+                <Button variant="outline" size="sm" className="hover:bg-blue-50 border-blue-200">
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Geri
+                </Button>
+              </Link>
+              <div>
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+                  {getDisplayName(debtor)}
+                </h1>
+                <div className="flex items-center space-x-3 mt-2">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                    {debtor.durumTanitici}
+                  </span>
+                  <span className="text-gray-500 text-sm">•</span>
+                  <span className="text-gray-600 text-sm font-medium">Borçlu Detayları</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Kişisel Bilgiler */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <User className="w-5 h-5" />
-                <span>Kişisel Bilgiler</span>
+          <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-gray-50 hover:shadow-xl transition-all duration-300">
+            <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-t-lg">
+              <CardTitle className="flex items-center space-x-3">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <User className="w-5 h-5" />
+                </div>
+                <span className="text-lg font-semibold">Kişisel Bilgiler</span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-500">TC Kimlik No</label>
-                  <p className="text-gray-900">{debtor.tcKimlikNo || 'Belirtilmemiş'}</p>
+            <CardContent className="p-6 space-y-6">
+              <div className="grid grid-cols-1 gap-6">
+                <div className="bg-gray-50 p-4 rounded-lg border-l-4 border-blue-400">
+                  <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">TC Kimlik No</label>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{debtor.tcKimlikNo || 'Belirtilmemiş'}</p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">İlgili TCKN</label>
-                  <p className="text-gray-900">{debtor.ilgiliTCKN || 'Belirtilmemiş'}</p>
+                <div className="bg-gray-50 p-4 rounded-lg border-l-4 border-green-400">
+                  <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">İlgili TCKN</label>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{debtor.ilgiliTCKN || 'Belirtilmemiş'}</p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Vergi No</label>
-                  <p className="text-gray-900">{debtor.vergiNo || 'Belirtilmemiş'}</p>
+                <div className="bg-gray-50 p-4 rounded-lg border-l-4 border-purple-400">
+                  <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Vergi No</label>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{debtor.vergiNo || 'Belirtilmemiş'}</p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Borçlu Tipi</label>
-                  <p className="text-gray-900">{debtor.borcluTipiTanimi || 'Belirtilmemiş'}</p>
+                <div className="bg-gray-50 p-4 rounded-lg border-l-4 border-orange-400">
+                  <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Borçlu Tipi</label>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{debtor.borcluTipiTanimi || 'Belirtilmemiş'}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           {/* İletişim Bilgileri */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Phone className="w-5 h-5" />
-                <span>İletişim Bilgileri</span>
+          <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-gray-50 hover:shadow-xl transition-all duration-300">
+            <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-t-lg">
+              <CardTitle className="flex items-center space-x-3">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <Phone className="w-5 h-5" />
+                </div>
+                <span className="text-lg font-semibold">İletişim Bilgileri</span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Telefon 1</label>
-                  <p className="text-gray-900">{debtor.telefon1 || 'Belirtilmemiş'}</p>
+            <CardContent className="p-6 space-y-6">
+              <div className="grid grid-cols-1 gap-6">
+                <div className="bg-green-50 p-4 rounded-lg border-l-4 border-green-400">
+                  <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Telefon 1</label>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{debtor.telefon1 || 'Belirtilmemiş'}</p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Telefon 2</label>
-                  <p className="text-gray-900">{debtor.telefon2 || 'Belirtilmemiş'}</p>
+                <div className="bg-green-50 p-4 rounded-lg border-l-4 border-green-500">
+                  <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Telefon 2</label>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{debtor.telefon2 || 'Belirtilmemiş'}</p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Telefon 3</label>
-                  <p className="text-gray-900">{debtor.telefon3 || 'Belirtilmemiş'}</p>
+                <div className="bg-green-50 p-4 rounded-lg border-l-4 border-green-600">
+                  <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Telefon 3</label>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{debtor.telefon3 || 'Belirtilmemiş'}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Adres Bilgileri */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <MapPin className="w-5 h-5" />
-                <span>Adres Bilgileri</span>
+          <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-gray-50 hover:shadow-xl transition-all duration-300">
+            <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-t-lg">
+              <CardTitle className="flex items-center space-x-3">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <MapPin className="w-5 h-5" />
+                </div>
+                <span className="text-lg font-semibold">Adres Bilgileri</span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-500">İl</label>
-                  <p className="text-gray-900">{debtor.il || 'Belirtilmemiş'}</p>
+            <CardContent className="p-6 space-y-6">
+              <div className="grid grid-cols-1 gap-6">
+                <div className="bg-purple-50 p-4 rounded-lg border-l-4 border-purple-400">
+                  <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">İl</label>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{debtor.il || 'Belirtilmemiş'}</p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">İlçe</label>
-                  <p className="text-gray-900">{debtor.ilce || 'Belirtilmemiş'}</p>
+                <div className="bg-purple-50 p-4 rounded-lg border-l-4 border-purple-500">
+                  <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">İlçe</label>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{debtor.ilce || 'Belirtilmemiş'}</p>
                 </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-500">Adres</label>
-                <p className="text-gray-900">{debtor.adresBilgileri || 'Belirtilmemiş'}</p>
+                <div className="bg-purple-50 p-4 rounded-lg border-l-4 border-purple-600">
+                  <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Adres</label>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{debtor.adresBilgileri || 'Belirtilmemiş'}</p>
+                </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Finansal Bilgiler */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <CreditCard className="w-5 h-5" />
-                <span>Finansal Bilgiler</span>
+          <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-gray-50 hover:shadow-xl transition-all duration-300">
+            <CardHeader className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-t-lg">
+              <CardTitle className="flex items-center space-x-3">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+                <span className="text-lg font-semibold">Finansal Bilgiler</span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Güncel Borç</label>
-                  <p className="text-lg font-semibold text-red-600">
+            <CardContent className="p-6 space-y-6">
+              <div className="grid grid-cols-1 gap-6">
+                <div className="bg-red-50 p-4 rounded-lg border-l-4 border-red-400">
+                  <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Güncel Borç</label>
+                  <p className="text-xl font-bold text-red-700 mt-1">
                     {formatCurrency(debtor.guncelBorc)}
                   </p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Asıl Alacak</label>
-                  <p className="text-gray-900">{formatCurrency(debtor.asilAlacak)}</p>
+                <div className="bg-emerald-50 p-4 rounded-lg border-l-4 border-emerald-400">
+                  <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Asıl Alacak</label>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{formatCurrency(debtor.asilAlacak)}</p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Takip Çıkış Miktarı</label>
-                  <p className="text-gray-900">{formatCurrency(debtor.takipCikisMiktari)}</p>
+                <div className="bg-emerald-50 p-4 rounded-lg border-l-4 border-emerald-500">
+                  <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Takip Çıkış Miktarı</label>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{formatCurrency(debtor.takipCikisMiktari)}</p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Toplam Açık Tutar</label>
-                  <p className="text-gray-900">{formatCurrency(debtor.toplamAcikTutar)}</p>
+                <div className="bg-emerald-50 p-4 rounded-lg border-l-4 border-emerald-600">
+                  <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Toplam Açık Tutar</label>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{formatCurrency(debtor.toplamAcikTutar)}</p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Vekalet Ücreti</label>
-                  <p className="text-gray-900">{formatCurrency(debtor.vekaletUcreti)}</p>
+                <div className="bg-emerald-50 p-4 rounded-lg border-l-4 border-emerald-700">
+                  <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Vekalet Ücreti</label>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{formatCurrency(debtor.vekaletUcreti)}</p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Ödeme Durumu</label>
-                  <p className="text-gray-900">{debtor.odemeDurumu || 'Belirtilmemiş'}</p>
+                <div className="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-400">
+                  <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Ödeme Durumu</label>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{debtor.odemeDurumu || 'Belirtilmemiş'}</p>
                 </div>
               </div>
             </CardContent>
@@ -366,53 +382,67 @@ export default function BorcluDetayPage() {
 
           {/* Ödeme Sözleri */}
           <div className="lg:col-span-2">
-            <PaymentPromisesList 
-              durumTanitici={debtor.durumTanitici} 
-              onAddPromise={() => setIsDialogOpen(true)}
-            />
+            <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-gray-50 hover:shadow-xl transition-all duration-300">
+              <CardHeader className="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white rounded-t-lg">
+                <CardTitle className="flex items-center space-x-3">
+                  <div className="p-2 bg-white/20 rounded-lg">
+                    <CreditCard className="w-5 h-5" />
+                  </div>
+                  <span className="text-lg font-semibold">Ödeme Sözleri</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <PaymentPromisesList 
+                  durumTanitici={debtor.durumTanitici} 
+                  onAddPromise={() => setIsDialogOpen(true)}
+                />
+              </CardContent>
+            </Card>
           </div>
 
           {/* Hukuki Bilgiler */}
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <FileText className="w-5 h-5" />
-                <span>Hukuki Bilgiler</span>
+          <Card className="lg:col-span-2 shadow-lg border-0 bg-gradient-to-br from-white to-gray-50 hover:shadow-xl transition-all duration-300">
+            <CardHeader className="bg-gradient-to-r from-red-500 to-red-600 text-white rounded-t-lg">
+              <CardTitle className="flex items-center space-x-3">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <span className="text-lg font-semibold">Hukuki Bilgiler</span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Sözleşme Hesabı</label>
-                  <p className="text-gray-900">{debtor.sozlesmeHesabi || 'Belirtilmemiş'}</p>
+            <CardContent className="p-6 space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-red-50 p-4 rounded-lg border-l-4 border-red-400">
+                  <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Sözleşme Hesabı</label>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{debtor.sozlesmeHesabi || 'Belirtilmemiş'}</p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">İcra Dosya No</label>
-                  <p className="text-gray-900">{debtor.icraDosyaNumarasi || 'Belirtilmemiş'}</p>
+                <div className="bg-red-50 p-4 rounded-lg border-l-4 border-red-500">
+                  <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">İcra Dosya No</label>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{debtor.icraDosyaNumarasi || 'Belirtilmemiş'}</p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">İcra Dairesi</label>
-                  <p className="text-gray-900">{debtor.icraDairesiTanimi || 'Belirtilmemiş'}</p>
+                <div className="bg-red-50 p-4 rounded-lg border-l-4 border-red-600">
+                  <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">İcra Dairesi</label>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{debtor.icraDairesiTanimi || 'Belirtilmemiş'}</p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Durum Tanımı</label>
-                  <p className="text-gray-900">{debtor.durumTanimi || 'Belirtilmemiş'}</p>
+                <div className="bg-red-50 p-4 rounded-lg border-l-4 border-red-700">
+                  <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Durum Tanımı</label>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{debtor.durumTanimi || 'Belirtilmemiş'}</p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Takip Tarihi</label>
-                  <p className="text-gray-900">{formatDate(debtor.takipTarihi)}</p>
+                <div className="bg-orange-50 p-4 rounded-lg border-l-4 border-orange-400">
+                  <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Takip Tarihi</label>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{formatDate(debtor.takipTarihi)}</p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Hitam Tarihi</label>
-                  <p className="text-gray-900">{formatDate(debtor.hitamTarihi)}</p>
+                <div className="bg-orange-50 p-4 rounded-lg border-l-4 border-orange-500">
+                  <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Hitam Tarihi</label>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{formatDate(debtor.hitamTarihi)}</p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Avukat Atama Tarihi</label>
-                  <p className="text-gray-900">{formatDate(debtor.avukatAtamaTarihi)}</p>
+                <div className="bg-orange-50 p-4 rounded-lg border-l-4 border-orange-600">
+                  <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Avukat Atama Tarihi</label>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{formatDate(debtor.avukatAtamaTarihi)}</p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">İtiraz Durumu</label>
-                  <p className="text-gray-900">{debtor.itirazDurumu || 'Belirtilmemiş'}</p>
+                <div className="bg-orange-50 p-4 rounded-lg border-l-4 border-orange-700">
+                  <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">İtiraz Durumu</label>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{debtor.itirazDurumu || 'Belirtilmemiş'}</p>
                 </div>
               </div>
             </CardContent>
@@ -420,88 +450,103 @@ export default function BorcluDetayPage() {
         </div>
 
         {/* Aksiyonlar */}
-        <div className="mt-6 flex justify-center space-x-4">
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Ödeme Sözü Ekle
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>Yeni Ödeme Sözü Ekle</DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <label htmlFor="tarih" className="text-right text-sm font-medium">
-                    Tarih
-                  </label>
-                  <Input
-                    id="tarih"
-                    type="date"
-                    value={odemeSozu.tarih}
-                    onChange={(e) => setOdemeSozu({ ...odemeSozu, tarih: e.target.value })}
-                    className="col-span-3"
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <label htmlFor="aciklama" className="text-right text-sm font-medium">
-                    Açıklama *
-                  </label>
-                  <Textarea
-                    id="aciklama"
-                    placeholder="Ödeme sözü ile ilgili açıklama..."
-                    value={odemeSozu.aciklama}
-                    onChange={(e) => setOdemeSozu({ ...odemeSozu, aciklama: e.target.value })}
-                    className="col-span-3"
-                    rows={3}
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <label htmlFor="miktar" className="text-right text-sm font-medium">
-                    Miktar (₺)
-                  </label>
-                  <Input
-                    id="miktar"
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00 (opsiyonel)"
-                    value={odemeSozu.miktar}
-                    onChange={(e) => setOdemeSozu({ ...odemeSozu, miktar: e.target.value })}
-                    className="col-span-3"
-                  />
-                </div>
+        <Card className="mt-8 shadow-lg border-0 bg-gradient-to-br from-white to-gray-50 hover:shadow-xl transition-all duration-300">
+          <CardHeader className="bg-gradient-to-r from-slate-600 to-slate-700 text-white rounded-t-lg">
+            <CardTitle className="flex items-center space-x-3">
+              <div className="p-2 bg-white/20 rounded-lg">
+                <Plus className="w-5 h-5" />
               </div>
-              <div className="flex justify-end space-x-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsDialogOpen(false)}
-                  disabled={isSaving}
-                >
-                  İptal
+              <span className="text-lg font-semibold">Aksiyonlar</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="flex items-center justify-center space-x-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105">
+                    <Plus className="w-5 h-5" />
+                    <span>Ödeme Sözü Ekle</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>Yeni Ödeme Sözü Ekle</DialogTitle>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <label htmlFor="tarih" className="text-right text-sm font-medium">
+                        Tarih
+                      </label>
+                      <Input
+                        id="tarih"
+                        type="date"
+                        value={odemeSozu.tarih}
+                        onChange={(e) => setOdemeSozu({ ...odemeSozu, tarih: e.target.value })}
+                        className="col-span-3"
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <label htmlFor="aciklama" className="text-right text-sm font-medium">
+                        Açıklama *
+                      </label>
+                      <Textarea
+                        id="aciklama"
+                        placeholder="Ödeme sözü ile ilgili açıklama..."
+                        value={odemeSozu.aciklama}
+                        onChange={(e) => setOdemeSozu({ ...odemeSozu, aciklama: e.target.value })}
+                        className="col-span-3"
+                        rows={3}
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <label htmlFor="miktar" className="text-right text-sm font-medium">
+                        Miktar (₺)
+                      </label>
+                      <Input
+                        id="miktar"
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00 (opsiyonel)"
+                        value={odemeSozu.miktar}
+                        onChange={(e) => setOdemeSozu({ ...odemeSozu, miktar: e.target.value })}
+                        className="col-span-3"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsDialogOpen(false)}
+                      disabled={isSaving}
+                    >
+                      İptal
+                    </Button>
+                    <Button
+                      onClick={handleOdemeSozuKaydet}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? 'Kaydediliyor...' : 'Kaydet'}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              
+              <Link href={`/odeme-sozleri?durumTanitici=${debtor.durumTanitici}`}>
+                <Button variant="outline" className="w-full flex items-center justify-center space-x-3 border-2 border-blue-500 text-blue-600 hover:bg-blue-50 font-semibold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105">
+                  <Calendar className="w-5 h-5" />
+                  <span>Ödeme Sözleri</span>
                 </Button>
-                <Button
-                  onClick={handleOdemeSozuKaydet}
-                  disabled={isSaving}
-                >
-                  {isSaving ? 'Kaydediliyor...' : 'Kaydet'}
+              </Link>
+              
+              <Link href="/borclular">
+                <Button variant="outline" className="w-full flex items-center justify-center space-x-3 border-2 border-gray-500 text-gray-600 hover:bg-gray-50 font-semibold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105">
+                  <ArrowLeft className="w-5 h-5" />
+                  <span>Borçlu Listesi</span>
                 </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-          <Link href={`/odeme-sozleri?durumTanitici=${debtor.durumTanitici}`}>
-            <Button variant="outline">
-              <Calendar className="w-4 h-4 mr-2" />
-              Ödeme Sözleri
-            </Button>
-          </Link>
-          <Link href="/borclular">
-            <Button variant="outline">
-              Borçlu Listesi
-            </Button>
-          </Link>
-        </div>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

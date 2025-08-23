@@ -38,26 +38,26 @@ export async function GET(request: NextRequest) {
     
     if (validatedParams.isim) {
       where.OR = [
-        { isim: { contains: validatedParams.isim, mode: 'insensitive' } },
-        { ad: { contains: validatedParams.isim, mode: 'insensitive' } },
-        { soyad: { contains: validatedParams.isim, mode: 'insensitive' } },
-        { muhatapTanimi: { contains: validatedParams.isim, mode: 'insensitive' } },
-        { muhatapTanimiEk: { contains: validatedParams.isim, mode: 'insensitive' } },
-        { durumTanimi: { contains: validatedParams.isim, mode: 'insensitive' } },
+        { isim: { contains: validatedParams.isim } },
+        { ad: { contains: validatedParams.isim } },
+        { soyad: { contains: validatedParams.isim } },
+        { muhatapTanimi: { contains: validatedParams.isim } },
+        { muhatapTanimiEk: { contains: validatedParams.isim } },
+        { durumTanimi: { contains: validatedParams.isim } },
       ];
     }
     
     if (validatedParams.durumTanitici) {
       where.OR = where.OR || [];
       where.OR.push(
-        { durumTanitici: { contains: validatedParams.durumTanitici, mode: 'insensitive' } },
-        { icraDosyaNumarasi: { contains: validatedParams.durumTanitici, mode: 'insensitive' } },
-        { sozlesmeHesabi: { contains: validatedParams.durumTanitici, mode: 'insensitive' } }
+        { durumTanitici: { contains: validatedParams.durumTanitici } },
+        { icraDosyaNumarasi: { contains: validatedParams.durumTanitici } },
+        { sozlesmeHesabi: { contains: validatedParams.durumTanitici } }
       );
     }
     
     if (validatedParams.sozlesmeHesabi) {
-      where.sozlesmeHesabi = { contains: validatedParams.sozlesmeHesabi, mode: 'insensitive' };
+      where.sozlesmeHesabi = { contains: validatedParams.sozlesmeHesabi };
     }
     
     if (validatedParams.minBorcMiktari || validatedParams.maxBorcMiktari) {
@@ -96,16 +96,16 @@ export async function GET(request: NextRequest) {
     if (validatedParams.telefon) {
       where.OR = where.OR || [];
       where.OR.push(
-        { telefon: { contains: validatedParams.telefon, mode: 'insensitive' } },
-        { telefonTesisat: { contains: validatedParams.telefon, mode: 'insensitive' } }
+        { telefon: { contains: validatedParams.telefon } },
+        { telefonTesisat: { contains: validatedParams.telefon } }
       );
     }
 
     if (validatedParams.tcKimlik) {
       where.OR = where.OR || [];
       where.OR.push(
-        { tcKimlikNo: { contains: validatedParams.tcKimlik, mode: 'insensitive' } },
-        { ilgiliTCKN: { contains: validatedParams.tcKimlik, mode: 'insensitive' } }
+        { tcKimlikNo: { contains: validatedParams.tcKimlik } },
+        { ilgiliTCKN: { contains: validatedParams.tcKimlik } }
       );
     }
 

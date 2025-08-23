@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -221,7 +221,7 @@ export default function BorclularPage() {
 
   useEffect(() => {
     fetchBorclular()
-  }, [urlParams.name, urlParams.durumTanitici, urlParams.minBorc, urlParams.maxBorc, urlParams.telefon, urlParams.tcKimlik])
+  }, [urlParams.name, urlParams.durumTanitici, urlParams.sozlesmeHesabi, urlParams.minBorc, urlParams.maxBorc, urlParams.telefon, urlParams.tcKimlik])
 
   useEffect(() => {
     const filtered = borclular.filter(borclu => 
@@ -332,13 +332,16 @@ export default function BorclularPage() {
     }
   }
 
-  // Ödeme sözü kontrolü fonksiyonu
-  const checkPaymentPromises = async (borclularList: Borclu[]) => {
+  // Ödeme sözü kontrolü fonksiyonu - optimize edilmiş versiyon
+  const checkPaymentPromises = useCallback(async (borclularList: Borclu[]) => {
     try {
-      const promises: {[key: string]: boolean} = {}
+      const promises: {[key: string]: boolean} = {...paymentPromises}
+      const uncheckedDebtors = borclularList.filter(borclu => 
+        !(borclu.durumTanitici in paymentPromises)
+      )
       
-      // Her borçlu için ödeme sözü kontrolü yap
-      for (const borclu of borclularList) {
+      // Sadece daha önce kontrol edilmemiş borçlular için API çağrısı yap
+      for (const borclu of uncheckedDebtors) {
         try {
           const response = await fetch(`/api/odeme-sozleri/${borclu.durumTanitici}`)
           if (response.ok) {
@@ -352,11 +355,14 @@ export default function BorclularPage() {
         }
       }
       
-      setPaymentPromises(promises)
+      // Sadece yeni veriler varsa state'i güncelle
+      if (uncheckedDebtors.length > 0) {
+        setPaymentPromises(promises)
+      }
     } catch (error) {
       console.error('Ödeme sözü kontrolü hatası:', error)
     }
-  }
+  }, [paymentPromises])
 
   const calculateStats = (data: Borclu[]) => {
     const stats = {
