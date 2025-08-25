@@ -5,10 +5,7 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   
   // Configure for containerized environment
-  experimental: {
-    // Enable server components
-    serverComponentsExternalPackages: ['whatsapp-web.js'],
-  },
+  serverExternalPackages: ['whatsapp-web.js'],
   
   // Webpack configuration for WhatsApp Web.js
   webpack: (config, { isServer }) => {

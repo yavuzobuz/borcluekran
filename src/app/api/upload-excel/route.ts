@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/prisma'
 
 // Türkçe karakterleri normalize eden yardımcı
 function normalizeKey(key: string) {
@@ -1051,10 +1049,10 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         errorCount++
         
-        // Güvenli veri erişimi için değişkenleri kontrol et
+        // Güvenli veri erişimi için mevcut satır verilerini kullan
         const safeData = {
-          durumTanitici: typeof durumTanitici !== 'undefined' ? durumTanitici : undefined,
-          muhatapTanimi: typeof finalMuhatapTanimi !== 'undefined' ? finalMuhatapTanimi : undefined
+          rowIndex: index + 2,
+          rawData: row
         }
         
         const processingError = logProcessingError(index, error, safeData, 'ROW_PROCESSING')
@@ -1199,7 +1197,5 @@ export async function POST(request: NextRequest) {
       { error: 'Excel dosyası işlenirken hata oluştu' },
       { status: 500 }
     )
-  } finally {
-    await prisma.$disconnect()
   }
 }

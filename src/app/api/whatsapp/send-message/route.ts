@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Client, LocalAuth, MessageMedia } from 'whatsapp-web.js'
 import QRCode from 'qrcode'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 import fs from 'fs'
 import path from 'path'
-
-const prisma = new PrismaClient()
 
 // WhatsApp client instance
 let client: Client | null = null
