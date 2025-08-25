@@ -1,0 +1,37 @@
+# Test-specific Docker configuration
+FROM node:18-alpine AS test
+
+WORKDIR /app
+
+# Install dependencies
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Create test database directory
+RUN mkdir -p /app/prisma/test
+
+# Set test environment
+ENV NODE_ENV=test
+ENV DATABASE_URL="file:/app/prisma/test/test.db"
+ENV GEMINI_API_KEY="test_key"
+ENV NEXTAUTH_SECRET="test_secret"
+ENV NEXTAUTH_URL="http://localhost:3000"
+
+# Create nextjs user for security
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Set proper permissions
+RUN chown -R nextjs:nodejs /app
+
+# Switch to nextjs user
+USER nextjs
+
+# Run tests
+CMD ["npm", "test"]

@@ -15,8 +15,25 @@ global.console = {
   // error: jest.fn(),
 }
 
-// Mock environment variables
-process.env.DATABASE_URL = 'file:./test.db'
+// Mock environment variables for testing
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = process.env.DOCKER_ENV ? 'file:/app/prisma/test/test.db' : 'file:./test.db'
+}
+
+// Setup test database cleanup
+beforeEach(async () => {
+  // Clean up test database before each test if needed
+  if (process.env.NODE_ENV === 'test') {
+    // Add any test-specific setup here
+  }
+})
+
+afterEach(async () => {
+  // Clean up after each test if needed
+  if (process.env.NODE_ENV === 'test') {
+    // Add any test-specific cleanup here
+  }
+})
 
 // Make sure Jest globals are available
 global.describe = describe

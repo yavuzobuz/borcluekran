@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    container_name: borclu-sorgulama-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=file:/app/prisma/dev.db
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=http://localhost:3000
+      - PORT=3000
+    volumes:
+      # Database persistence
+      - borclu-db-data:/app/prisma
+      # WhatsApp session persistence
+      - whatsapp-session-data:/app/.wwebjs_auth
+      - whatsapp-cache-data:/app/.wwebjs_cache
+      # Temporary upload files
+      - upload-temp-data:/app/temp
+      # Development: mount source code for hot reload
+      - ./src:/app/src:ro
+      - ./public:/app/public:ro
+    networks:
+      - borclu-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  borclu-db-data:
+    driver: local
+  whatsapp-session-data:
+    driver: local
+  whatsapp-cache-data:
+    driver: local
+  upload-temp-data:
+    driver: local
+
+networks:
+  borclu-network:
+    driver: bridge

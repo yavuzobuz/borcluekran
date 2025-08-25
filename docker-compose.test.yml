@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: borclu-sorgulama-test
+    environment:
+      - NODE_ENV=test
+      - DATABASE_URL=file:/app/prisma/test/test.db
+      - GEMINI_API_KEY=test_key
+      - NEXTAUTH_SECRET=test_secret
+      - NEXTAUTH_URL=http://localhost:3000
+    volumes:
+      # Mount source code for development testing
+      - ./src:/app/src:ro
+      - ./prisma:/app/prisma:ro
+      - ./__tests__:/app/__tests__:ro
+      - ./jest.config.js:/app/jest.config.js:ro
+      - ./jest.setup.js:/app/jest.setup.js:ro
+      # Test database isolation
+      - test-db-data:/app/prisma/test
+    networks:
+      - test-network
+    command: npm test
+
+  test-coverage:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: borclu-sorgulama-test-coverage
+    environment:
+      - NODE_ENV=test
+      - DATABASE_URL=file:/app/prisma/test/test.db
+      - GEMINI_API_KEY=test_key
+      - NEXTAUTH_SECRET=test_secret
+      - NEXTAUTH_URL=http://localhost:3000
+    volumes:
+      # Mount source code for development testing
+      - ./src:/app/src:ro
+      - ./prisma:/app/prisma:ro
+      - ./__tests__:/app/__tests__:ro
+      - ./jest.config.js:/app/jest.config.js:ro
+      - ./jest.setup.js:/app/jest.setup.js:ro
+      # Test database isolation
+      - test-db-data:/app/prisma/test
+      # Coverage output
+      - ./coverage:/app/coverage
+    networks:
+      - test-network
+    command: npm run test:coverage
+
+volumes:
+  test-db-data:
+    driver: local
+
+networks:
+  test-network:
+    driver: bridge

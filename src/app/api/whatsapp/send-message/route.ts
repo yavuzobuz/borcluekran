@@ -18,12 +18,15 @@ function initializeClient() {
 
   console.log('Creating new WhatsApp client...')
   
+  const sessionPath = process.env.WHATSAPP_SESSION_PATH || './.wwebjs_auth'
+  
   client = new Client({
     authStrategy: new LocalAuth({
-      clientId: "whatsapp-client"
+      clientId: "whatsapp-client",
+      dataPath: sessionPath
     }),
     puppeteer: {
-      headless: false, // Always false for better debugging
+      headless: true, // Set to true for Docker container
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -33,7 +36,10 @@ function initializeClient() {
         '--no-zygote',
         '--disable-gpu',
         '--disable-web-security',
-        '--disable-features=VizDisplayCompositor'
+        '--disable-features=VizDisplayCompositor',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding'
       ]
     }
   })
@@ -326,7 +332,7 @@ export async function POST(request: NextRequest) {
                 }
                 
                 // Create temp directory if it doesn't exist
-                const tempDir = path.join(process.cwd(), 'temp')
+                const tempDir = process.env.UPLOAD_TEMP_PATH || path.join(process.cwd(), 'temp')
                 if (!fs.existsSync(tempDir)) {
                   fs.mkdirSync(tempDir, { recursive: true })
                 }
@@ -571,7 +577,7 @@ export async function POST(request: NextRequest) {
             }
             
             // Create temp directory if it doesn't exist
-            const tempDir = path.join(process.cwd(), 'temp')
+            const tempDir = process.env.UPLOAD_TEMP_PATH || path.join(process.cwd(), 'temp')
             if (!fs.existsSync(tempDir)) {
               fs.mkdirSync(tempDir, { recursive: true })
             }
