@@ -6,9 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Search, FileText, Calendar, TrendingUp } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Search, FileText, Calendar, TrendingUp, Upload, FileImage, FileIcon, X } from 'lucide-react'
 import Link from 'next/link'
 import { Header } from '@/components/header'
+import { WhatsAppMessageTemplates } from '@/components/whatsapp-message-templates'
 
 interface Borclu {
   // Prisma schema'ya uygun field'lar
@@ -70,8 +73,8 @@ export default function BorclularPage() {
   const searchParams = useSearchParams()
   const [borclular, setBorclular] = useState<Borclu[]>([])
   const [filteredBorclular, setFilteredBorclular] = useState<Borclu[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({
     toplam: 0,
     aktif: 0,
@@ -79,6 +82,157 @@ export default function BorclularPage() {
     geciken: 0,
     toplamBorc: 0
   })
+  const [selectedBorclu, setSelectedBorclu] = useState<Borclu | null>(null)
+  const [isWhatsAppDialogOpen, setIsWhatsAppDialogOpen] = useState(false)
+  const [whatsAppMessage, setWhatsAppMessage] = useState({
+    message: '',
+    phoneNumber: ''
+  })
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [isWhatsAppSending, setIsWhatsAppSending] = useState(false)
+  const [whatsAppStatus, setWhatsAppStatus] = useState<{
+    isReady: boolean
+    qrCode?: string | null
+    message?: string
+  } | null>(null)
+
+  // Yardımcı fonksiyonlar
+  const getDisplayName = (borclu: Borclu): string => {
+    if (borclu.muhatapTanimi) return borclu.muhatapTanimi
+    if (borclu.isim) return borclu.isim
+    if (borclu.ad && borclu.soyad) return `${borclu.ad} ${borclu.soyad}`
+    if (borclu.ad) return borclu.ad
+    return 'İsimsiz Borçlu'
+  }
+
+  // WhatsApp fonksiyonları
+  const checkWhatsAppStatus = async () => {
+    try {
+      const response = await fetch('/api/whatsapp/send-message')
+      const data = await response.json()
+      setWhatsAppStatus(data)
+    } catch (error) {
+      console.error('WhatsApp durum kontrolü hatası:', error)
+    }
+  }
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (files) {
+      const validFiles = Array.from(files).filter(file => {
+        const isValidType = file.type.startsWith('image/') || file.type === 'application/pdf'
+        const isValidSize = file.size <= 10 * 1024 * 1024 // 10MB limit
+        return isValidType && isValidSize
+      })
+      
+      if (validFiles.length !== files.length) {
+        alert('Sadece resim (JPG, PNG, GIF) ve PDF dosyaları, maksimum 10MB boyutunda kabul edilir.')
+      }
+      
+      setSelectedFiles(prev => [...prev, ...validFiles])
+    }
+  }
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const handleWhatsAppOpen = async (borclu: Borclu) => {
+    setSelectedBorclu(borclu)
+    setWhatsAppMessage({
+      message: '',
+      phoneNumber: borclu.telefon || ''
+    })
+    setIsWhatsAppDialogOpen(true)
+    await checkWhatsAppStatus()
+  }
+
+  const convertFilesToBase64 = async (files: File[]): Promise<any[]> => {
+    const filePromises = files.map(file => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          resolve({
+            data: reader.result,
+            filename: file.name,
+            mimetype: file.type
+          })
+        }
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+    })
+    
+    return Promise.all(filePromises)
+  }
+
+  const handleWhatsAppSend = async () => {
+    if (!whatsAppMessage.phoneNumber || !whatsAppMessage.message) {
+      alert('Telefon numarası ve mesaj gereklidir')
+      return
+    }
+
+    setIsWhatsAppSending(true)
+    try {
+      // Dosyaları base64'e çevir
+      let filesData = null
+      if (selectedFiles.length > 0) {
+        console.log('Converting files to base64:', selectedFiles.length)
+        filesData = await convertFilesToBase64(selectedFiles)
+        console.log('Files converted:', filesData.length)
+      }
+
+      console.log('Sending WhatsApp message with files:', !!filesData)
+      const response = await fetch('/api/whatsapp/send-message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          phoneNumber: whatsAppMessage.phoneNumber,
+          message: whatsAppMessage.message,
+          debtorName: selectedBorclu ? getDisplayName(selectedBorclu) : 'Bilinmeyen Borçlu',
+          durumTanitici: selectedBorclu?.durumTanitici || 'Bilinmeyen',
+          files: filesData
+        })
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        alert('WhatsApp mesajı başarıyla gönderildi')
+        setIsWhatsAppDialogOpen(false)
+        setWhatsAppMessage({ message: '', phoneNumber: '' })
+        setSelectedBorclu(null)
+        setSelectedFiles([])
+      } else {
+        // Handle session closed / needs reconnection
+        if (result.needsReconnection) {
+          setWhatsAppStatus({ isReady: false, qrCode: null, message: 'WhatsApp oturumu kapandı. Lütfen yeniden bağlanın.' })
+          alert('WhatsApp oturumu kapandı. Lütfen sayfayı yenileyip QR kodu ile tekrar bağlanın.')
+        } else {
+          setWhatsAppStatus({ isReady: false, qrCode: result.qrCode, message: result.error })
+          if (!result.qrCode) {
+            alert(result.error || 'Mesaj gönderilemedi')
+          }
+        }
+      }
+    } catch (error) {
+      console.error('WhatsApp mesaj gönderme hatası:', error)
+      alert('Mesaj gönderilirken hata oluştu')
+    } finally {
+      setIsWhatsAppSending(false)
+    }
+  }
+
+
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('tr-TR', {
+      style: 'currency',
+      currency: 'TRY'
+    }).format(amount)
+  }
 
   // URL parametrelerini oku
   const urlParams = {
@@ -327,7 +481,7 @@ export default function BorclularPage() {
     } catch (error) {
       console.error('Borçlular yüklenirken hata:', error)
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
@@ -376,15 +530,182 @@ export default function BorclularPage() {
     }
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="container mx-auto p-6">
         <div className="flex items-center justify-center h-64">
           <div className="text-lg">Borçlular yükleniyor...</div>
-        </div>
       </div>
-    )
-  }
+
+      {/* WhatsApp Mesaj Gönderme Dialog */}
+      <Dialog open={isWhatsAppDialogOpen} onOpenChange={setIsWhatsAppDialogOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-base">WhatsApp Mesaj</DialogTitle>
+            <DialogDescription className="text-xs">
+              {selectedBorclu && getDisplayName(selectedBorclu)} için mesaj
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-2">
+            {whatsAppStatus && !whatsAppStatus.isReady && whatsAppStatus.qrCode && (
+              <div className="text-center p-2 bg-yellow-50 rounded border border-yellow-200">
+                <p className="text-xs text-yellow-800 mb-1">
+                  QR tarayın:
+                </p>
+                <img 
+                  src={whatsAppStatus.qrCode} 
+                  alt="WhatsApp QR Code" 
+                  className="mx-auto max-w-[120px] border rounded"
+                />
+                <p className="text-xs text-yellow-700 mt-1">
+                  Telefonunuzla QR kodu okuttuktan sonra tekrar deneyin.
+                </p>
+              </div>
+            )}
+            
+            <div>
+              <label htmlFor="whatsapp-phone" className="text-xs font-medium mb-1 block">
+                Telefon
+              </label>
+              <Input
+                id="whatsapp-phone"
+                type="tel"
+                placeholder="05xxxxxxxxx"
+                value={whatsAppMessage.phoneNumber}
+                onChange={(e) => setWhatsAppMessage({ ...whatsAppMessage, phoneNumber: e.target.value })}
+                className="w-full text-sm h-8"
+              />
+            </div>
+            
+            <div>
+              <label className="text-xs font-medium mb-1 block">
+                Şablonlar
+              </label>
+              <WhatsAppMessageTemplates
+                onSelectTemplate={(template) => {
+                  setWhatsAppMessage({ ...whatsAppMessage, message: template.content })
+                }}
+                debtorInfo={selectedBorclu ? {
+                  name: getDisplayName(selectedBorclu),
+                  debt: selectedBorclu.guncelBorc || 0,
+                  dueDate: selectedBorclu.takipTarihi ? new Date(selectedBorclu.takipTarihi).toLocaleDateString('tr-TR') : undefined
+                } : undefined}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium mb-1 block">
+                Dosya Ekle (Resim/PDF)
+              </label>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    id="file-upload"
+                    multiple
+                    accept="image/*,.pdf"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.getElementById('file-upload')?.click()}
+                    className="text-xs"
+                  >
+                    <Upload className="w-3 h-3 mr-1" />
+                    Dosya Seç
+                  </Button>
+                  <span className="text-xs text-gray-500">
+                    Resim veya PDF (max 10MB)
+                  </span>
+                </div>
+                
+                {selectedFiles.length > 0 && (
+                  <div className="space-y-1">
+                    {selectedFiles.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded text-xs">
+                        <div className="flex items-center gap-2">
+                          {file.type.startsWith('image/') ? (
+                            <FileImage className="w-3 h-3 text-blue-500" />
+                          ) : (
+                            <FileIcon className="w-3 h-3 text-red-500" />
+                          )}
+                          <span className="truncate max-w-[200px]">{file.name}</span>
+                          <span className="text-gray-400">
+                            ({(file.size / 1024 / 1024).toFixed(1)}MB)
+                          </span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFile(index)}
+                          className="h-6 w-6 p-0 text-gray-400 hover:text-red-500"
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+              
+            <div>
+              <label htmlFor="whatsapp-message" className="text-xs font-medium mb-1 block">
+                Mesaj
+              </label>
+              <Textarea
+                id="whatsapp-message"
+                placeholder="Mesajınızı yazın..."
+                value={whatsAppMessage.message}
+                onChange={(e) => setWhatsAppMessage({ ...whatsAppMessage, message: e.target.value })}
+                className="w-full text-sm"
+                rows={2}
+              />
+            </div>
+          </div>
+            
+            {whatsAppStatus && (
+              <div className={`p-2 rounded text-xs ${
+                whatsAppStatus.isReady 
+                  ? 'bg-green-50 text-green-800 border border-green-200'
+                  : 'bg-yellow-50 text-yellow-800 border border-yellow-200'
+              }`}>
+                <strong>Durum:</strong> {whatsAppStatus.message || 'Bilinmiyor'}
+              </div>
+            )}
+          <div className="flex justify-end space-x-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsWhatsAppDialogOpen(false)
+                setSelectedBorclu(null)
+                setWhatsAppMessage({ message: '', phoneNumber: '' })
+                setSelectedFiles([])
+              }}
+              disabled={isWhatsAppSending}
+              size="sm"
+            >
+              İptal
+            </Button>
+            <Button
+              onClick={handleWhatsAppSend}
+              disabled={isWhatsAppSending || (whatsAppStatus ? !whatsAppStatus.isReady : false)}
+              className="bg-green-600 hover:bg-green-700"
+              size="sm"
+            >
+              {isWhatsAppSending ? 'Gönderiliyor...' : 'Gönder'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -397,73 +718,73 @@ export default function BorclularPage() {
         </div>
 
         {/* İstatistikler */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Toplam Borçlu</CardTitle>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+          <Card className="p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Toplam</p>
+                <p className="text-lg font-bold">{stats.toplam}</p>
+              </div>
               <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.toplam}</div>
-            </CardContent>
+            </div>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Aktif</CardTitle>
+          <Card className="p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Aktif</p>
+                <p className="text-lg font-bold text-blue-600">{stats.aktif}</p>
+              </div>
               <TrendingUp className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{stats.aktif}</div>
-            </CardContent>
+            </div>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Ödenen</CardTitle>
+          <Card className="p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Ödenen</p>
+                <p className="text-lg font-bold text-green-600">{stats.odenen}</p>
+              </div>
               <Calendar className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats.odenen}</div>
-            </CardContent>
+            </div>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Geciken</CardTitle>
+          <Card className="p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Geciken</p>
+                <p className="text-lg font-bold text-red-600">{stats.geciken}</p>
+              </div>
               <Calendar className="h-4 w-4 text-red-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{stats.geciken}</div>
-            </CardContent>
+            </div>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Toplam Borç</CardTitle>
+          <Card className="p-3 md:col-span-1 col-span-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Toplam Borç</p>
+                <p className="text-lg font-bold">{stats.toplamBorc.toLocaleString('tr-TR')} ₺</p>
+              </div>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.toplamBorc.toLocaleString('tr-TR')} ₺</div>
-            </CardContent>
+            </div>
           </Card>
         </div>
 
         {/* Arama */}
-        <div className="mb-6">
+        <div className="mb-4">
           <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Muhatap tanımı, TC kimlik, durum tanıtıcı veya icra dosya numarası ile ara..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-10 h-9"
             />
           </div>
         </div>
 
         {/* Borçlu Listesi */}
-        <div className="grid gap-4">
+        <div className="grid gap-3">
           {filteredBorclular.length === 0 ? (
             <Card>
               <CardContent className="p-6 text-center">
@@ -479,74 +800,89 @@ export default function BorclularPage() {
             filteredBorclular.map((borclu) => {
               console.log(`Borçlu ${borclu.durumTanitici} (${borclu.muhatapTanimi}): hasActivePaymentPromise = ${borclu.hasActivePaymentPromise}`)
               return (
-                <Card key={borclu.id} className="p-4 hover:shadow-md transition-shadow border-l-4 border-l-blue-500">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-3">
-                        <h3 className="font-bold text-xl text-gray-900">
+                <Card key={borclu.id} className="p-3 hover:shadow-md transition-shadow border-l-4 border-l-blue-500">
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="font-bold text-lg text-gray-900 truncate">
                           {composeName(borclu)}
                         </h3>
-                        <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-full">
+                        <Badge variant="secondary" className="text-xs px-2 py-1 bg-blue-100 text-blue-800 shrink-0">
                           {borclu.durumTanitici}
-                        </span>
+                        </Badge>
                       </div>
-                      <div className="space-y-2">
-                        <p className="text-base text-gray-700">
-                          <span className="font-semibold text-gray-900">İlgili TCKN:</span> <span className="font-medium">{borclu.ilgiliTCKN || borclu.tcKimlikNo || 'Belirtilmemiş'}</span>
-                        </p>
-                        {borclu.il && (
-                          <p className="text-base text-gray-700">
-                            <span className="font-semibold text-gray-900">İl:</span> <span className="font-medium">{borclu.il}</span>
-                          </p>
-                        )}
-                        {borclu.telefon && (
-                          <p className="text-base text-gray-700">
-                            <span className="font-semibold text-gray-900">Telefon:</span> <span className="font-medium">{borclu.telefon}</span>
-                          </p>
-                        )}
-                        {borclu.icraDosyaNumarasi && (
-                          <p className="text-base text-gray-700">
-                            <span className="font-semibold text-gray-900">İcra Dosya:</span> <span className="font-medium">{borclu.icraDosyaNumarasi}</span>
-                          </p>
-                        )}
+                      
+                      <div className="space-y-3">
+                        {/* Kişisel Bilgiler */}
+                        <div className="flex flex-wrap gap-2">
+                          <div className="bg-gray-50 px-3 py-1 rounded-full border">
+                            <span className="text-xs font-medium text-gray-600">TCKN:</span>
+                            <span className="text-xs font-mono text-gray-900 ml-1">
+                              {borclu.ilgiliTCKN || borclu.tcKimlikNo || 'Belirtilmemiş'}
+                            </span>
+                          </div>
+                          {borclu.telefon && (
+                            <div className="bg-green-50 px-3 py-1 rounded-full border border-green-200">
+                              <span className="text-xs font-medium text-green-600">Telefon:</span>
+                              <span className="text-xs font-mono text-green-800 ml-1">{borclu.telefon}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Lokasyon ve Hukuki Bilgiler */}
+                        <div className="flex flex-wrap gap-2">
+                          {borclu.il && (
+                            <div className="bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+                              <span className="text-xs font-medium text-blue-600">İl:</span>
+                              <span className="text-xs font-semibold text-blue-800 ml-1">{borclu.il}</span>
+                            </div>
+                          )}
+                          {borclu.icraDosyaNumarasi && (
+                            <div className="bg-orange-50 px-3 py-1 rounded-full border border-orange-200">
+                              <span className="text-xs font-medium text-orange-600">İcra No:</span>
+                              <span className="text-xs font-mono font-bold text-orange-800 ml-1">{borclu.icraDosyaNumarasi}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Sözleşme Bilgisi */}
                         {borclu.sozlesmeHesabi && (
-                          <p className="text-base text-gray-700">
-                            <span className="font-semibold text-gray-900">Sözleşme Hesabı:</span> <span className="font-medium">{borclu.sozlesmeHesabi}</span>
-                          </p>
-                        )}
-                        {borclu.hasActivePaymentPromise && (
-                          <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                            <p className="text-base text-yellow-700 font-semibold flex items-center">
-                              <Calendar className="w-5 h-5 mr-2" />
-                              Ödeme Taahhüdü Mevcut - Takip Edilmeli!
-                            </p>
-                            <p className="text-sm text-yellow-600 mt-1 font-medium">
-                              Bu borçlu için aktif ödeme sözü bulunmaktadır.
-                            </p>
+                          <div className="bg-purple-50 px-3 py-2 rounded-lg border border-purple-200">
+                            <span className="text-xs font-medium text-purple-600">Sözleşme Hesabı:</span>
+                            <span className="text-xs font-mono text-purple-800 ml-2">{borclu.sozlesmeHesabi}</span>
                           </div>
                         )}
                       </div>
+                      
+                      {borclu.hasActivePaymentPromise && (
+                        <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                          <p className="text-yellow-700 font-medium flex items-center">
+                            <Calendar className="w-3 h-3 mr-1" />
+                            Ödeme Taahhüdü Mevcut
+                          </p>
+                        </div>
+                      )}
                     </div>
-                    <div className="text-right">
-                      <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                        <p className="text-2xl font-bold text-green-800">
+                    
+                    <div className="text-right shrink-0">
+                      <div className="bg-green-50 p-2 rounded border border-green-200 min-w-[120px]">
+                        <p className="text-lg font-bold text-green-800">
                           ₺{(borclu.guncelBorc || borclu.borcMiktari || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                         </p>
-                        <p className="text-sm text-green-700 font-semibold">Güncel Borç</p>
+                        <p className="text-xs text-green-700 font-medium">Güncel Borç</p>
+                      </div>
+                      <div className="flex gap-2 mt-2">
+                        <Link href={`/borclular/${borclu.id}`} className="w-full">
+                          <Button
+                            variant="default"
+                            size="sm"
+                            className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 w-full"
+                          >
+                            Detay
+                          </Button>
+                        </Link>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="flex justify-end items-center pt-3 border-t">
-                    <Link href={`/borclular/${borclu.id}`}>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-md px-4"
-                      >
-                        Detay Görüntüle
-                      </Button>
-                    </Link>
                   </div>
                 </Card>
               )

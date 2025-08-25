@@ -6,10 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { ArrowLeft, User, Phone, MapPin, Calendar, CreditCard, FileText, Plus, Settings } from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { ArrowLeft, User, Phone, MapPin, Calendar, CreditCard, FileText, Plus, Settings, MessageCircle, Upload, FileImage, FileIcon, X } from 'lucide-react'
 import Link from 'next/link'
 import { PaymentPromisesList } from '@/components/payment-promises-list'
+import { WhatsAppMessageTemplates } from '@/components/whatsapp-message-templates'
 
 interface Debtor {
   id: number
@@ -27,7 +28,7 @@ interface Debtor {
   adresBilgileri?: string
   il?: string
   ilce?: string
-  telefon1?: string
+  telefon?: string
   telefon2?: string
   aboneGrubu?: string
   asilAlacak?: number
@@ -70,6 +71,18 @@ export default function BorcluDetayPage() {
     aciklama: ''
   })
   const [isSaving, setIsSaving] = useState(false)
+  const [isWhatsAppDialogOpen, setIsWhatsAppDialogOpen] = useState(false)
+  const [whatsAppMessage, setWhatsAppMessage] = useState({
+    message: '',
+    phoneNumber: ''
+  })
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [isWhatsAppSending, setIsWhatsAppSending] = useState(false)
+  const [whatsAppStatus, setWhatsAppStatus] = useState<{
+    isReady: boolean
+    qrCode?: string
+    message?: string
+  } | null>(null)
 
   const id = params.id as string
 
@@ -138,6 +151,122 @@ export default function BorcluDetayPage() {
       alert('Ödeme sözü kaydedilirken bir hata oluştu')
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  // WhatsApp fonksiyonları
+  const checkWhatsAppStatus = async () => {
+    try {
+      const response = await fetch('/api/whatsapp/send-message')
+      const data = await response.json()
+      setWhatsAppStatus(data)
+      return data
+    } catch (error) {
+      console.error('WhatsApp durum kontrolü hatası:', error)
+      return null
+    }
+  }
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (files) {
+      const validFiles = Array.from(files).filter(file => {
+        const isValidType = file.type.startsWith('image/') || file.type === 'application/pdf'
+        const isValidSize = file.size <= 10 * 1024 * 1024 // 10MB limit
+        return isValidType && isValidSize
+      })
+      
+      if (validFiles.length !== files.length) {
+        alert('Sadece resim (JPG, PNG, GIF) ve PDF dosyaları, maksimum 10MB boyutunda kabul edilir.')
+      }
+      
+      setSelectedFiles(prev => [...prev, ...validFiles])
+    }
+  }
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const handleWhatsAppOpen = async () => {
+    // Telefon numarasını otomatik doldur
+    const phoneNumber = debtor?.telefon || debtor?.telefon2 || debtor?.telefon3 || ''
+    setWhatsAppMessage({
+      message: `Sayın ${getDisplayName(debtor!)},\n\nBorç takip süreciniz hakkında bilgilendirme yapmak istiyoruz.\n\nGüncel borcunuz: ${formatCurrency(debtor?.guncelBorc)}\n\nDetaylı bilgi için lütfen bizimle iletişime geçin.\n\nSaygılarımızla,\nBorç Takip Ekibi`,
+      phoneNumber: phoneNumber
+    })
+    setIsWhatsAppDialogOpen(true)
+    await checkWhatsAppStatus()
+  }
+
+  const convertFilesToBase64 = async (files: File[]): Promise<any[]> => {
+    const filePromises = files.map(file => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          resolve({
+            data: reader.result,
+            filename: file.name,
+            mimetype: file.type
+          })
+        }
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+    })
+    
+    return Promise.all(filePromises)
+  }
+
+  const handleWhatsAppSend = async () => {
+    if (!whatsAppMessage.phoneNumber || !whatsAppMessage.message) {
+      alert('Lütfen telefon numarası ve mesaj alanlarını doldurun')
+      return
+    }
+
+    setIsWhatsAppSending(true)
+    try {
+      // Dosyaları base64'e çevir
+      let filesData = null
+      if (selectedFiles.length > 0) {
+        console.log('Converting files to base64:', selectedFiles.length)
+        filesData = await convertFilesToBase64(selectedFiles)
+        console.log('Files converted:', filesData.length)
+      }
+
+      console.log('Sending WhatsApp message with files:', !!filesData)
+      const response = await fetch('/api/whatsapp/send-message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phoneNumber: whatsAppMessage.phoneNumber,
+          message: whatsAppMessage.message,
+          debtorName: getDisplayName(debtor!),
+          durumTanitici: debtor?.durumTanitici,
+          files: filesData
+        })
+      })
+
+      const result = await response.json()
+      
+      if (response.ok && result.success) {
+        alert('WhatsApp mesajı başarıyla gönderildi')
+        setIsWhatsAppDialogOpen(false)
+        setWhatsAppMessage({ message: '', phoneNumber: '' })
+        setSelectedFiles([])
+      } else {
+        if (result.qrCode) {
+          setWhatsAppStatus({ isReady: false, qrCode: result.qrCode, message: result.error })
+        }
+        alert(result.error || 'Mesaj gönderilirken bir hata oluştu')
+      }
+    } catch (error) {
+      console.error('WhatsApp mesaj gönderme hatası:', error)
+      alert('Mesaj gönderilirken bir hata oluştu')
+    } finally {
+      setIsWhatsAppSending(false)
     }
   }
 
@@ -296,7 +425,7 @@ export default function BorcluDetayPage() {
               <div className="grid grid-cols-1 gap-6">
                 <div className="bg-green-50 p-4 rounded-lg border-l-4 border-green-400">
                   <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Telefon 1</label>
-                  <p className="text-lg font-bold text-gray-900 mt-1">{debtor.telefon1 || 'Belirtilmemiş'}</p>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{debtor.telefon || 'Belirtilmemiş'}</p>
                 </div>
                 <div className="bg-green-50 p-4 rounded-lg border-l-4 border-green-500">
                   <label className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Telefon 2</label>
@@ -460,7 +589,7 @@ export default function BorcluDetayPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
                   <Button className="flex items-center justify-center space-x-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105">
@@ -469,8 +598,11 @@ export default function BorcluDetayPage() {
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle>Yeni Ödeme Sözü Ekle</DialogTitle>
+                   <DialogHeader>
+                     <DialogTitle>Yeni Ödeme Sözü Ekle</DialogTitle>
+                     <DialogDescription>
+                       Bu borçlu için yeni bir ödeme sözü ekleyin
+                     </DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
                     <div className="grid grid-cols-4 items-center gap-4">
@@ -537,6 +669,175 @@ export default function BorcluDetayPage() {
                   <span>Ödeme Sözleri</span>
                 </Button>
               </Link>
+              
+              {/* WhatsApp Mesaj Gönderme */}
+              <Dialog open={isWhatsAppDialogOpen} onOpenChange={setIsWhatsAppDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button 
+                    onClick={handleWhatsAppOpen}
+                    className="w-full flex items-center justify-center space-x-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105"
+                  >
+                    <MessageCircle className="w-5 h-5" />
+                    <span>WhatsApp Gönder</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>WhatsApp Mesajı Gönder</DialogTitle>
+                    <DialogDescription>
+                      Bu borçluya WhatsApp mesajı gönderin
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    {whatsAppStatus && !whatsAppStatus.isReady && whatsAppStatus.qrCode && (
+                      <div className="text-center p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <p className="text-sm text-yellow-800 mb-3">
+                          WhatsApp bağlantısı için QR kodu okutun:
+                        </p>
+                        <img 
+                          src={whatsAppStatus.qrCode} 
+                          alt="WhatsApp QR Code" 
+                          className="mx-auto max-w-[200px] border rounded"
+                        />
+                        <p className="text-xs text-yellow-700 mt-2">
+                          Telefonunuzla QR kodu okuttuktan sonra tekrar deneyin.
+                        </p>
+                      </div>
+                    )}
+                    
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <label htmlFor="whatsapp-phone" className="text-right text-sm font-medium">
+                        Telefon
+                      </label>
+                      <Input
+                        id="whatsapp-phone"
+                        type="tel"
+                        placeholder="05xxxxxxxxx"
+                        value={whatsAppMessage.phoneNumber}
+                        onChange={(e) => setWhatsAppMessage({ ...whatsAppMessage, phoneNumber: e.target.value })}
+                        className="col-span-3"
+                      />
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <WhatsAppMessageTemplates
+                        onSelectTemplate={(template) => {
+                          setWhatsAppMessage({ ...whatsAppMessage, message: template.content })
+                        }}
+                        debtorInfo={{
+                          name: getDisplayName(debtor!),
+                          debt: debtor?.guncelBorc || 0,
+                          dueDate: debtor?.takipTarihi ? formatDate(debtor.takipTarihi) : undefined
+                        }}
+                      />
+
+                      <div className="grid grid-cols-4 items-start gap-4">
+                        <label className="text-right text-sm font-medium pt-2">
+                          Dosya Ekle
+                        </label>
+                        <div className="col-span-3 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="file"
+                              id="file-upload-borclu"
+                              multiple
+                              accept="image/*,.pdf"
+                              onChange={handleFileSelect}
+                              className="hidden"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => document.getElementById('file-upload-borclu')?.click()}
+                              className="text-xs"
+                            >
+                              <Upload className="w-3 h-3 mr-1" />
+                              Dosya Seç
+                            </Button>
+                            <span className="text-xs text-gray-500">
+                              Resim veya PDF (max 10MB)
+                            </span>
+                          </div>
+                          
+                          {selectedFiles.length > 0 && (
+                            <div className="space-y-1">
+                              {selectedFiles.map((file, index) => (
+                                <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded text-xs">
+                                  <div className="flex items-center gap-2">
+                                    {file.type.startsWith('image/') ? (
+                                      <FileImage className="w-3 h-3 text-blue-500" />
+                                    ) : (
+                                      <FileIcon className="w-3 h-3 text-red-500" />
+                                    )}
+                                    <span className="truncate max-w-[200px]">{file.name}</span>
+                                    <span className="text-gray-400">
+                                      ({(file.size / 1024 / 1024).toFixed(1)}MB)
+                                    </span>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeFile(index)}
+                                    className="h-6 w-6 p-0 text-gray-400 hover:text-red-500"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-4 items-start gap-4">
+                        <label htmlFor="whatsapp-message" className="text-right text-sm font-medium pt-2">
+                          Mesaj
+                        </label>
+                        <Textarea
+                          id="whatsapp-message"
+                          placeholder="Mesajınızı yazın veya yukarıdan şablon seçin..."
+                          value={whatsAppMessage.message}
+                          onChange={(e) => setWhatsAppMessage({ ...whatsAppMessage, message: e.target.value })}
+                          className="col-span-3"
+                          rows={8}
+                        />
+                      </div>
+                    </div>
+                    
+                    {whatsAppStatus && (
+                      <div className={`p-3 rounded-lg text-sm ${
+                        whatsAppStatus.isReady 
+                          ? 'bg-green-50 text-green-800 border border-green-200'
+                          : 'bg-yellow-50 text-yellow-800 border border-yellow-200'
+                      }`}>
+                        <strong>Durum:</strong> {whatsAppStatus.message || 'Bilinmiyor'}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setIsWhatsAppDialogOpen(false)
+                        setWhatsAppMessage({ message: '', phoneNumber: '' })
+                        setSelectedFiles([])
+                      }}
+                      disabled={isWhatsAppSending}
+                    >
+                      İptal
+                    </Button>
+                    <Button
+                      onClick={handleWhatsAppSend}
+                      disabled={isWhatsAppSending || (whatsAppStatus ? !whatsAppStatus.isReady : false)}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      {isWhatsAppSending ? 'Gönderiliyor...' : 'Gönder'}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
               
               <Link href="/borclular">
                 <Button variant="outline" className="w-full flex items-center justify-center space-x-3 border-2 border-gray-500 text-gray-600 hover:bg-gray-50 font-semibold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105">

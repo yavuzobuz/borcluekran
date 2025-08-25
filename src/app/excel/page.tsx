@@ -12,6 +12,9 @@ interface UploadResult {
   message: string
   processedCount?: number
   errorCount?: number
+  createdCount?: number
+  updatedCount?: number
+  mode?: string
   errors?: string[]
 }
 
@@ -395,6 +398,7 @@ export default function ExcelPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null)
+  const [uploadMode, setUploadMode] = useState<'replace' | 'update'>('update')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -413,6 +417,7 @@ export default function ExcelPage() {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      formData.append('mode', uploadMode)
 
       const response = await fetch('/api/upload-excel', {
         method: 'POST',
@@ -506,6 +511,45 @@ export default function ExcelPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
+                  {/* Yükleme Modu Seçimi */}
+                  <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <h4 className="font-semibold text-blue-900 mb-3">Yükleme Modu</h4>
+                    <div className="space-y-3">
+                      <label className="flex items-start space-x-3 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="uploadMode"
+                          value="update"
+                          checked={uploadMode === 'update'}
+                          onChange={(e) => setUploadMode(e.target.value as 'update')}
+                          className="mt-1"
+                        />
+                        <div>
+                          <div className="font-medium text-blue-900">Güncelleme Modu (Önerilen)</div>
+                          <div className="text-sm text-blue-700">
+                            Mevcut kayıtları günceller, yeni kayıtları ekler. Eski veriler korunur.
+                          </div>
+                        </div>
+                      </label>
+                      <label className="flex items-start space-x-3 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="uploadMode"
+                          value="replace"
+                          checked={uploadMode === 'replace'}
+                          onChange={(e) => setUploadMode(e.target.value as 'replace')}
+                          className="mt-1"
+                        />
+                        <div>
+                          <div className="font-medium text-blue-900">Değiştirme Modu</div>
+                          <div className="text-sm text-blue-700">
+                            Sadece yeni kayıtlar ekler. Mevcut kayıtlar değişmez.
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors">
                     <FileSpreadsheet className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">Excel Dosyası Seçin</h3>
@@ -563,6 +607,16 @@ export default function ExcelPage() {
                           {uploadResult.success && uploadResult.processedCount !== undefined && (
                             <div className="mt-2 text-sm text-green-700">
                               <p>İşlenen kayıt: {uploadResult.processedCount}</p>
+                              {uploadResult.mode === 'update' && (
+                                <>
+                                  {uploadResult.createdCount !== undefined && (
+                                    <p>Yeni kayıt: {uploadResult.createdCount}</p>
+                                  )}
+                                  {uploadResult.updatedCount !== undefined && (
+                                    <p>Güncellenen kayıt: {uploadResult.updatedCount}</p>
+                                  )}
+                                </>
+                              )}
                               {uploadResult.errorCount !== undefined && uploadResult.errorCount > 0 && (
                                 <p>Hatalı kayıt: {uploadResult.errorCount}</p>
                               )}
@@ -609,9 +663,11 @@ export default function ExcelPage() {
                     <li>• <strong>Telefon:</strong> Telefon numarası (opsiyonel)</li>
                     <li>• <strong>İl:</strong> İl bilgisi (opsiyonel)</li>
                   </ul>
-                  <p className="text-xs text-gray-500 mt-3">
-                    * Mevcut kayıtlar güncellenecek, yeni kayıtlar eklenecektir.
-                  </p>
+                  <div className="mt-3 p-3 bg-gray-50 rounded text-xs text-gray-600">
+                    <p className="font-medium mb-1">Yükleme Modları:</p>
+                    <p><strong>Güncelleme:</strong> Durum tanıtıcısı aynı olan kayıtları günceller, yenilerini ekler</p>
+                    <p><strong>Değiştirme:</strong> Sadece yeni kayıtlar ekler, mevcut kayıtlara dokunmaz</p>
+                  </div>
                 </div>
               </CardContent>
             </Card>

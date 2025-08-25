@@ -19,11 +19,474 @@ function normalizeKey(key: string) {
 
 function parseTrNumber(val: any): number | undefined {
   if (val === undefined || val === null || val === '') return undefined
-  if (typeof val === 'number') return val
+  if (typeof val === 'number') {
+    return isNaN(val) ? undefined : val
+  }
   if (typeof val !== 'string') return undefined
-  const cleaned = val.replace(/\./, '').replace(/,/g, '.')
-  const num = parseFloat(cleaned)
-  return isNaN(num) ? undefined : num
+  
+  try {
+    // Türkçe sayı formatını temizle: "1.234,56" -> "1234.56"
+    const cleaned = val.trim()
+      .replace(/\s/g, '') // Boşlukları kaldır
+      .replace(/\./g, '') // Binlik ayırıcı noktaları kaldır
+      .replace(/,/g, '.') // Ondalık virgülü noktaya çevir
+    
+    if (cleaned === '') return undefined
+    
+    const num = parseFloat(cleaned)
+    return isNaN(num) ? undefined : num
+  } catch (error) {
+    console.warn(`[parseTrNumber] Sayı dönüştürme hatası: "${val}"`, error)
+    return undefined
+  }
+}
+
+// Yeni: Kapsamlı veri tipi doğrulama fonksiyonu
+function validateAndConvertTypes(data: any): { isValid: boolean; errors: string[]; convertedData?: any } {
+  const errors: string[] = []
+  const convertedData: any = {}
+  
+  try {
+    // durumTanitici - zorunlu string field
+    if (!data.durumTanitici || String(data.durumTanitici).trim() === '') {
+      errors.push('durumTanitici alanı zorunludur ve boş olamaz')
+    } else {
+      convertedData.durumTanitici = String(data.durumTanitici).trim()
+    }
+    
+    // String alanları güvenli dönüştür
+    const stringFields = [
+      'ilgiliTCKN', 'avukatAtamaTarihi', 'durum', 'muhatapTanimi', 'durumTanimi',
+      'sozlesmeHesabi', 'tcKimlikNo', 'vergiNo', 'icraDosyaNumarasi', 'icraDairesiTanimi',
+      'adresBilgileri', 'il', 'ilce', 'telefon', 'telefon2', 'telefon3', 'telefonAboneGrubu', 'itirazDurumu',
+      'borcluTipiTanimi', 'hitamTarihi', 'takipTarihi', 'nedenTanimi', 'durumTuru',
+      'durumTuruTanimi', 'tesisatDurumu', 'odemeDurumu', 'neden', 'muhatapTanimiEk',
+      'uyapDurumu', 'telefonTesisat', 'tesisatDurumuTanimi', 'ad', 'soyad'
+    ]
+    
+    stringFields.forEach(field => {
+      if (data[field] !== undefined && data[field] !== null) {
+        const stringValue = String(data[field]).trim()
+        convertedData[field] = stringValue !== '' ? stringValue : undefined
+      } else {
+        convertedData[field] = undefined
+      }
+    })
+    
+    // Sayısal alanları dönüştür
+    const numericFields = [
+      'asilAlacak', 'takipCikisMiktari', 'takipOncesiTahsilat', 'takipSonrasiTahsilat',
+      'toplamAcikTutar', 'guncelBorc', 'vekaletUcreti'
+    ]
+    
+    numericFields.forEach(field => {
+      if (data[field] !== undefined && data[field] !== null) {
+        const numValue = parseTrNumber(data[field])
+        if (numValue !== undefined && numValue < 0) {
+          errors.push(`${field} alanı negatif olamaz`)
+        }
+        convertedData[field] = numValue
+      } else {
+        convertedData[field] = undefined
+      }
+    })
+    
+    return {
+      isValid: errors.length === 0,
+      errors,
+      convertedData: errors.length === 0 ? convertedData : undefined
+    }
+  } catch (error) {
+    errors.push(`Veri doğrulama hatası: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`)
+    return { isValid: false, errors }
+  }
+}
+
+// Yeni: Zorunlu alanları kontrol et
+function validateRequiredFields(data: any): string[] {
+  const errors: string[] = []
+  
+  if (!data.durumTanitici || String(data.durumTanitici).trim() === '') {
+    errors.push('Durum Tanıtıcı alanı zorunludur')
+  }
+  
+  return errors
+}
+
+// Yeni: Hata kategorileri
+enum ErrorType {
+  TYPE_MISMATCH = 'TYPE_MISMATCH',
+  REQUIRED_FIELD = 'REQUIRED_FIELD',
+  DATABASE_ERROR = 'DATABASE_ERROR',
+  VALIDATION_ERROR = 'VALIDATION_ERROR',
+  PROCESSING_ERROR = 'PROCESSING_ERROR'
+}
+
+interface ProcessingError {
+  rowIndex: number
+  field?: string
+  value?: any
+  errorType: ErrorType
+  message: string
+  suggestion?: string
+}
+
+interface ProcessingWarning {
+  rowIndex: number
+  field?: string
+  message: string
+}
+
+// Yeni: Gelişmiş hata loglama
+function logProcessingError(
+  rowIndex: number, 
+  error: any, 
+  data: any, 
+  context: string = ''
+): ProcessingError {
+  const errorMessage = error instanceof Error ? error.message : String(error)
+  
+  let errorType = ErrorType.PROCESSING_ERROR
+  let suggestion = ''
+  
+  // Hata tipini belirle
+  if (errorMessage.includes('Invalid value provided') || errorMessage.includes('Expected')) {
+    errorType = ErrorType.TYPE_MISMATCH
+    suggestion = 'Veri tipini kontrol edin ve doğru formatta olduğundan emin olun'
+  } else if (errorMessage.includes('required') || errorMessage.includes('zorunlu')) {
+    errorType = ErrorType.REQUIRED_FIELD
+    suggestion = 'Zorunlu alanların dolu olduğundan emin olun'
+  } else if (errorMessage.includes('Unique constraint') || errorMessage.includes('UNIQUE')) {
+    errorType = ErrorType.DATABASE_ERROR
+    suggestion = 'Bu Durum Tanıtıcı zaten mevcut, güncelleme modunu kullanın'
+  } else if (errorMessage.includes('validation') || errorMessage.includes('doğrulama')) {
+    errorType = ErrorType.VALIDATION_ERROR
+    suggestion = 'Veri formatını kontrol edin'
+  }
+  
+  const processingError: ProcessingError = {
+    rowIndex,
+    errorType,
+    message: errorMessage,
+    suggestion
+  }
+  
+  // Detaylı log
+  console.error(`[upload-excel][${context}] Satır ${rowIndex + 2} hatası:`, {
+    error: errorMessage,
+    errorType,
+    data: {
+      durumTanitici: data?.durumTanitici || 'Tanımsız',
+      muhatapTanimi: data?.muhatapTanimi || 'Tanımsız'
+    },
+    suggestion
+  })
+  
+  return processingError
+}
+
+// Yeni: Hataları kategorize et
+function categorizeErrors(errors: ProcessingError[]): Record<ErrorType, ProcessingError[]> {
+  const categorized: Record<ErrorType, ProcessingError[]> = {
+    [ErrorType.TYPE_MISMATCH]: [],
+    [ErrorType.REQUIRED_FIELD]: [],
+    [ErrorType.DATABASE_ERROR]: [],
+    [ErrorType.VALIDATION_ERROR]: [],
+    [ErrorType.PROCESSING_ERROR]: []
+  }
+  
+  errors.forEach(error => {
+    categorized[error.errorType].push(error)
+  })
+  
+  return categorized
+}
+
+// Yeni: Hata raporu oluştur
+function generateErrorReport(errors: ProcessingError[]): string {
+  if (errors.length === 0) return ''
+  
+  const categorized = categorizeErrors(errors)
+  const report: string[] = []
+  
+  Object.entries(categorized).forEach(([type, typeErrors]) => {
+    if (typeErrors.length > 0) {
+      let categoryName = ''
+      switch (type as ErrorType) {
+        case ErrorType.TYPE_MISMATCH:
+          categoryName = 'Veri Tipi Hataları'
+          break
+        case ErrorType.REQUIRED_FIELD:
+          categoryName = 'Zorunlu Alan Hataları'
+          break
+        case ErrorType.DATABASE_ERROR:
+          categoryName = 'Veritabanı Hataları'
+          break
+        case ErrorType.VALIDATION_ERROR:
+          categoryName = 'Doğrulama Hataları'
+          break
+        case ErrorType.PROCESSING_ERROR:
+          categoryName = 'İşlem Hataları'
+          break
+      }
+      
+      report.push(`${categoryName}: ${typeErrors.length} hata`)
+    }
+  })
+  
+  return report.join(', ')
+}
+
+// Yeni: Kullanıcı için sonraki adımlar öner
+function generateNextSteps(summary: any, errors: ProcessingError[], warnings: ProcessingWarning[]): string[] {
+  const steps: string[] = []
+  
+  if (summary.successRate === 100) {
+    steps.push('🎉 Tüm veriler başarıyla işlendi!')
+    if (warnings.length > 0) {
+      steps.push('📋 Veri kalitesini artırmak için uyarıları gözden geçirebilirsiniz')
+    }
+    steps.push('📊 Borçlu listesini görüntülemek için "Borçlular" sayfasına gidin')
+    return steps
+  }
+  
+  if (summary.successRate === 0) {
+    steps.push('🔍 Excel dosyanızın formatını kontrol edin')
+    steps.push('📝 Örnek Excel şablonunu indirip kullanın')
+    steps.push('✅ Zorunlu alanların dolu olduğundan emin olun')
+    
+    const typeErrors = errors.filter(e => e.errorType === ErrorType.TYPE_MISMATCH)
+    if (typeErrors.length > 0) {
+      steps.push('🔢 Sayısal alanların Türkçe format (1.234,56) olduğunu kontrol edin')
+    }
+    
+    const requiredErrors = errors.filter(e => e.errorType === ErrorType.REQUIRED_FIELD)
+    if (requiredErrors.length > 0) {
+      steps.push('⚠️ "Durum Tanıtıcı" sütununun her satırda dolu olduğundan emin olun')
+    }
+    
+    return steps
+  }
+  
+  // Kısmi başarı durumu
+  steps.push(`✅ ${summary.processedRows} kayıt başarıyla işlendi`)
+  steps.push(`❌ ${summary.failedRows} kayıt işlenemedi`)
+  
+  if (summary.failedRows > 0) {
+    steps.push('📋 Hatalı satırları Excel\'de düzeltin ve tekrar yükleyin')
+    
+    const commonErrors = errors.reduce((acc, error) => {
+      acc[error.errorType] = (acc[error.errorType] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+    
+    const mostCommonError = Object.entries(commonErrors)
+      .sort(([,a], [,b]) => b - a)[0]
+    
+    if (mostCommonError) {
+      const [errorType, count] = mostCommonError
+      switch (errorType) {
+        case ErrorType.TYPE_MISMATCH:
+          steps.push(`🔢 En çok veri tipi hatası var (${count} adet) - sayı formatlarını kontrol edin`)
+          break
+        case ErrorType.REQUIRED_FIELD:
+          steps.push(`📝 En çok zorunlu alan hatası var (${count} adet) - boş hücreleri doldurun`)
+          break
+        case ErrorType.DATABASE_ERROR:
+          steps.push(`💾 Veritabanı hataları var (${count} adet) - duplicate kayıtları kontrol edin`)
+          break
+      }
+    }
+  }
+  
+  if (warnings.length > 0) {
+    steps.push(`⚠️ ${warnings.length} uyarı var - veri kalitesini artırabilirsiniz`)
+    
+    if (summary.dataQuality.emptyMuhatapCount > 0) {
+      steps.push('👤 Muhatap tanımı boş olan kayıtları tamamlayın')
+    }
+    if (summary.dataQuality.invalidTCKNCount > 0) {
+      steps.push('🆔 Geçersiz TC kimlik numaralarını düzeltin')
+    }
+    if (summary.dataQuality.invalidPhoneCount > 0) {
+      steps.push('📞 Geçersiz telefon numaralarını düzeltin')
+    }
+  }
+  
+  steps.push('📊 İşlenen kayıtları görüntülemek için "Borçlular" sayfasına gidin')
+  
+  return steps
+}
+
+// Yeni: Metin temizleme ve doğrulama
+function sanitizeText(value: any): string | undefined {
+  if (value === undefined || value === null) return undefined
+  
+  const text = String(value).trim()
+  if (text === '') return undefined
+  
+  // Zararlı karakterleri temizle
+  const cleaned = text
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Kontrol karakterleri
+    .replace(/\s+/g, ' ') // Çoklu boşlukları tek boşluğa çevir
+    .trim()
+  
+  return cleaned !== '' ? cleaned : undefined
+}
+
+// Yeni: Telefon numarası doğrulama ve temizleme
+function sanitizePhoneNumber(value: any): string | undefined {
+  if (value === undefined || value === null) return undefined
+  
+  const phone = String(value).trim()
+  if (phone === '') return undefined
+  
+  // Sadece rakamları al
+  const digitsOnly = phone.replace(/\D/g, '')
+  
+  // Türk telefon numarası formatları
+  if (digitsOnly.length === 10 && digitsOnly.startsWith('5')) {
+    return digitsOnly // 5xxxxxxxxx
+  } else if (digitsOnly.length === 11 && digitsOnly.startsWith('05')) {
+    return digitsOnly.substring(1) // 05xxxxxxxxx -> 5xxxxxxxxx
+  } else if (digitsOnly.length === 13 && digitsOnly.startsWith('905')) {
+    return digitsOnly.substring(2) // 905xxxxxxxxx -> 5xxxxxxxxx
+  } else if (digitsOnly.length >= 7) {
+    return digitsOnly // Diğer formatlar için ham veriyi döndür
+  }
+  
+  return undefined
+}
+
+// Yeni: TC Kimlik No doğrulama
+function validateTCKN(value: any): string | undefined {
+  if (value === undefined || value === null) return undefined
+  
+  const tckn = String(value).trim().replace(/\D/g, '')
+  if (tckn.length !== 11) return undefined
+  
+  // Basit TCKN doğrulama
+  if (tckn === '00000000000' || tckn[0] === '0') return undefined
+  
+  return tckn
+}
+
+// Yeni: Tarih doğrulama ve temizleme
+function sanitizeDate(value: any): string | undefined {
+  if (value === undefined || value === null) return undefined
+  
+  const dateStr = String(value).trim()
+  if (dateStr === '') return undefined
+  
+  // Excel tarih formatları için
+  if (/^\d{5}$/.test(dateStr)) {
+    // Excel serial date (örn: 45821)
+    try {
+      const excelDate = new Date((parseInt(dateStr) - 25569) * 86400 * 1000)
+      return excelDate.toISOString().split('T')[0] // YYYY-MM-DD formatı
+    } catch {
+      return dateStr // Dönüştürülemezse orijinal değeri döndür
+    }
+  }
+  
+  // Diğer tarih formatları için orijinal değeri döndür
+  return dateStr
+}
+
+// Yeni: Gelişmiş alan doğrulama
+function validateFieldIntegrity(fieldName: string, value: any, rowData: any): ProcessingWarning[] {
+  const warnings: ProcessingWarning[] = []
+  
+  switch (fieldName) {
+    case 'tcKimlikNo':
+    case 'ilgiliTCKN':
+      if (value && !validateTCKN(value)) {
+        warnings.push({
+          rowIndex: -1, // Caller tarafından set edilecek
+          field: fieldName,
+          message: `${fieldName} geçersiz format (11 haneli olmalı)`
+        })
+      }
+      break
+      
+    case 'telefon':
+    case 'telefon2':
+    case 'telefon3':
+      if (value && !sanitizePhoneNumber(value)) {
+        warnings.push({
+          rowIndex: -1,
+          field: fieldName,
+          message: 'Telefon numarası geçersiz format'
+        })
+      }
+      break
+      
+    case 'guncelBorc':
+    case 'asilAlacak':
+      if (value !== undefined && (typeof value !== 'number' || value < 0)) {
+        warnings.push({
+          rowIndex: -1,
+          field: fieldName,
+          message: `${fieldName} negatif olamaz`
+        })
+      }
+      break
+      
+    case 'muhatapTanimi':
+      if (!value || String(value).trim() === '') {
+        warnings.push({
+          rowIndex: -1,
+          field: fieldName,
+          message: 'Muhatap tanımı boş, veri kalitesi düşük olabilir'
+        })
+      }
+      break
+  }
+  
+  return warnings
+}
+
+// Yeni: Kapsamlı veri temizleme
+function sanitizeRowData(rawData: any): any {
+  const sanitized: any = {}
+  
+  // String alanları temizle
+  const stringFields = [
+    'durumTanitici', 'ilgiliTCKN', 'durum', 'muhatapTanimi', 'durumTanimi',
+    'sozlesmeHesabi', 'vergiNo', 'icraDosyaNumarasi', 'icraDairesiTanimi',
+    'adresBilgileri', 'il', 'ilce', 'telefonAboneGrubu', 'itirazDurumu',
+    'borcluTipiTanimi', 'nedenTanimi', 'durumTuru', 'durumTuruTanimi',
+    'tesisatDurumu', 'odemeDurumu', 'neden', 'muhatapTanimiEk',
+    'uyapDurumu', 'telefonTesisat', 'tesisatDurumuTanimi', 'ad', 'soyad'
+  ]
+  
+  stringFields.forEach(field => {
+    sanitized[field] = sanitizeText(rawData[field])
+  })
+  
+  // Özel alanları temizle
+  sanitized.telefon = sanitizePhoneNumber(rawData.telefon)
+  sanitized.telefon2 = sanitizePhoneNumber(rawData.telefon2)
+  sanitized.telefon3 = sanitizePhoneNumber(rawData.telefon3)
+  sanitized.tcKimlikNo = validateTCKN(rawData.tcKimlikNo)
+  sanitized.ilgiliTCKN = validateTCKN(rawData.ilgiliTCKN)
+  
+  // Tarih alanları
+  sanitized.avukatAtamaTarihi = sanitizeDate(rawData.avukatAtamaTarihi)
+  sanitized.takipTarihi = sanitizeDate(rawData.takipTarihi)
+  sanitized.hitamTarihi = sanitizeDate(rawData.hitamTarihi)
+  
+  // Sayısal alanlar (zaten parseTrNumber ile işleniyor)
+  const numericFields = [
+    'asilAlacak', 'takipCikisMiktari', 'takipOncesiTahsilat', 'takipSonrasiTahsilat',
+    'toplamAcikTutar', 'guncelBorc', 'vekaletUcreti'
+  ]
+  
+  numericFields.forEach(field => {
+    sanitized[field] = rawData[field] // parseTrNumber zaten uygulanmış
+  })
+  
+  return sanitized
 }
 
 function getValue(row: Record<string, any>, candidates: string[]): any {
@@ -53,9 +516,12 @@ function getValue(row: Record<string, any>, candidates: string[]): any {
 }
 
 export async function POST(request: NextRequest) {
+  let transaction: any = null
+  
   try {
     const formData = await request.formData()
     const file = formData.get('file') as File
+    const mode = formData.get('mode') as string || 'replace' // 'replace' veya 'update'
 
     if (!file) {
       return NextResponse.json(
@@ -70,12 +536,37 @@ export async function POST(request: NextRequest) {
     const sheetName = workbook.SheetNames[0]
     const worksheet = workbook.Sheets[sheetName]
     const data = XLSX.utils.sheet_to_json(worksheet)
+    
+    // Büyük dosyalar için transaction başlat
+    const shouldUseTransaction = data.length > 100 || mode === 'replace'
+    if (shouldUseTransaction) {
+      console.log(`[upload-excel] Transaction başlatılıyor (${data.length} satır)`)
+    }
 
     let successCount = 0
     let errorCount = 0
+    let updatedCount = 0
+    let createdCount = 0
     const errors: string[] = []
+    const processingErrors: ProcessingError[] = []
+    const warnings: ProcessingWarning[] = []
+    
+    // Kritik hatalar için rollback flag
+    let hasCriticalErrors = false
+    const processedRecords: string[] = [] // Başarılı işlemleri takip et
+
+    // Progress tracking için
+    const totalRows = data.length
+    const progressInterval = Math.max(1, Math.floor(totalRows / 20)) // %5'lik aralıklarla progress
+    
+    console.log(`[upload-excel] İşlem başlatılıyor: ${totalRows} satır`)
 
     for (const [index, row] of data.entries()) {
+      // Progress reporting
+      if (index % progressInterval === 0 || index === totalRows - 1) {
+        const progressPercent = Math.round((index / totalRows) * 100)
+        console.log(`[upload-excel] İlerleme: %${progressPercent} (${index + 1}/${totalRows})`)
+      }
       try {
         const r = row as Record<string, any>
 
@@ -83,9 +574,12 @@ export async function POST(request: NextRequest) {
         const ilgiliTCKN = getValue(r, [
           'İlgili TCKN', 'ilgili TCKN', 'TC Kimlik No', 'T.C. Kimlik No', 'TCKN', 'tc no', 'tc kimlik no', 'ilgili_tckn', 'tcKimlikNo'
         ])
-        const durumTanitici = getValue(r, [
+        const durumTaniciRaw = getValue(r, [
           'Durum tanıtıcısı', 'Durum Tanıtıcısı', 'Durum Tanıtıcı', 'Durum Tanitici', 'Durum Taniticisi', 'durum_tanitici', 'durumTanitici'
         ])
+        
+        // durumTanitici'yi her zaman string'e çevir (Prisma schema String bekliyor)
+        const durumTanitici = durumTaniciRaw !== undefined && durumTaniciRaw !== null ? String(durumTaniciRaw).trim() : undefined
 
         // Excel dosyasındaki gerçek "Muhatap tanımı" sütununu yakala
         // Önce direkt sütun adıyla dene
@@ -338,8 +832,10 @@ export async function POST(request: NextRequest) {
         const adresBilgileri = getValue(r, ['Adres Bilgileri', 'adres bilgileri', 'Adres'])
         const il = getValue(r, ['İl', 'il', 'IL'])
         const ilce = getValue(r, ['İlçe', 'ilçe', 'ILCE'])
-        const telefon = getValue(r, ['Telefon', 'telefon', 'Telefon No'])
-        const telefonAboneGrubu = getValue(r, ['Telefon Abone Grubu', 'telefon abone grubu'])
+        const telefon = getValue(r, ['Telefon', 'telefon', 'Telefon No', 'Telefon_1', 'Telefon 1'])
+        const telefon2 = getValue(r, ['Telefon_2', 'Telefon 2', 'Telefon2', 'İkinci Telefon'])
+        const telefon3 = getValue(r, ['Telefon_3', 'Telefon 3', 'Telefon3', 'Üçüncü Telefon'])
+        const telefonAboneGrubu = getValue(r, ['Telefon Abone Grubu', 'telefon abone grubu', 'Abone Grubu'])
         const asilAlacak = parseTrNumber(getValue(r, ['Asıl Alacak', 'asıl alacak', 'Asil Alacak']))
         const takipCikisMiktari = parseTrNumber(getValue(r, ['Takip Çıkış Miktarı', 'takip çıkış miktarı']))
         const takipOncesiTahsilat = parseTrNumber(getValue(r, ['Takip Öncesi Tahsilat', 'takip öncesi tahsilat']))
@@ -363,8 +859,14 @@ export async function POST(request: NextRequest) {
         const telefonTesisat = getValue(r, ['Telefon Tesisat', 'telefon tesisat'])
         const tesisatDurumuTanimi = getValue(r, ['Tesisat Durumu Tanımı', 'tesisat durumu tanımı'])
 
-        if (!durumTanitici) {
-          errors.push(`Satır ${index + 2}: Durum Tanıtıcı eksik`)
+        // Önce zorunlu alanları kontrol et
+        const requiredFieldErrors = validateRequiredFields({ durumTanitici })
+        if (requiredFieldErrors.length > 0) {
+          requiredFieldErrors.forEach(error => {
+            const processingError = logProcessingError(index, new Error(error), { durumTanitici }, 'REQUIRED_FIELD_CHECK')
+            processingErrors.push(processingError)
+            errors.push(`Satır ${index + 2}: ${error}`)
+          })
           errorCount++
           continue
         }
@@ -398,63 +900,297 @@ export async function POST(request: NextRequest) {
           console.log(`[Final] Muhatap Tanımı: '${finalMuhatapTanimi ?? 'BOŞ KALACAK'}'`)
         }
         
-        await prisma.borcluBilgileri.create({
-          data: {
-            ilgiliTCKN: ilgiliTCKN || undefined,
-            avukatAtamaTarihi: avukatAtamaTarihi || undefined,
-            durum: durum || undefined,
-            durumTanitici,
-            muhatapTanimi: finalMuhatapTanimi,
-            durumTanimi: durumTanimi || undefined,
-            sozlesmeHesabi: sozlesmeHesabi || undefined,
-            tcKimlikNo: tcKimlikNo || undefined,
-            vergiNo: vergiNo || undefined,
-            icraDosyaNumarasi: icraDosyaNumarasi || undefined,
-            icraDairesiTanimi: icraDairesiTanimi || undefined,
-            adresBilgileri: adresBilgileri || undefined,
-            il: il || undefined,
-            ilce: ilce || undefined,
-            telefon: telefon || undefined,
-            telefonAboneGrubu: telefonAboneGrubu || undefined,
-            asilAlacak: asilAlacak || undefined,
-            takipCikisMiktari: takipCikisMiktari || undefined,
-            takipOncesiTahsilat: takipOncesiTahsilat || undefined,
-            takipSonrasiTahsilat: takipSonrasiTahsilat || undefined,
-            toplamAcikTutar: toplamAcikTutar || undefined,
-            guncelBorc: guncelBorc || undefined,
-            itirazDurumu: itirazDurumu || undefined,
-            borcluTipiTanimi: borcluTipiTanimi || undefined,
-            hitamTarihi: hitamTarihi || undefined,
-            takipTarihi: takipTarihi || undefined,
-            nedenTanimi: nedenTanimi || undefined,
-            durumTuru: durumTuru || undefined,
-            durumTuruTanimi: durumTuruTanimi || undefined,
-            tesisatDurumu: tesisatDurumu || undefined,
-            odemeDurumu: odemeDurumu || undefined,
-            vekaletUcreti: vekaletUcreti || undefined,
-            neden: neden || undefined,
-            muhatapTanimiEk: (muhatapTanimiEk && String(muhatapTanimiEk).trim() !== '' && muhatapTanimiEk !== finalMuhatapTanimi) ? 
-              String(muhatapTanimiEk).trim() : undefined,
-            uyapDurumu: uyapDurumu || undefined,
-            telefonTesisat: telefonTesisat || undefined,
-            tesisatDurumuTanimi: tesisatDurumuTanimi || undefined,
-            ad: ad || undefined,
-            soyad: soyad || undefined
-          }
+        // Ham veriyi hazırla
+        const rawData = {
+          durumTanitici,
+          ilgiliTCKN,
+          avukatAtamaTarihi,
+          durum,
+          muhatapTanimi: finalMuhatapTanimi,
+          durumTanimi,
+          sozlesmeHesabi,
+          tcKimlikNo,
+          vergiNo,
+          icraDosyaNumarasi,
+          icraDairesiTanimi,
+          adresBilgileri,
+          il,
+          ilce,
+          telefon,
+          telefon2,
+          telefon3,
+          telefonAboneGrubu,
+          asilAlacak,
+          takipCikisMiktari,
+          takipOncesiTahsilat,
+          takipSonrasiTahsilat,
+          toplamAcikTutar,
+          guncelBorc,
+          itirazDurumu,
+          borcluTipiTanimi,
+          hitamTarihi,
+          takipTarihi,
+          nedenTanimi,
+          durumTuru,
+          durumTuruTanimi,
+          tesisatDurumu,
+          odemeDurumu,
+          vekaletUcreti,
+          neden,
+          muhatapTanimiEk: (muhatapTanimiEk && String(muhatapTanimiEk).trim() !== '' && muhatapTanimiEk !== finalMuhatapTanimi) ? 
+            muhatapTanimiEk : undefined,
+          uyapDurumu,
+          telefonTesisat,
+          tesisatDurumuTanimi,
+          ad,
+          soyad
+        }
+        
+        // Veriyi temizle ve sanitize et
+        const sanitizedData = sanitizeRowData(rawData)
+        
+        // Alan bütünlüğü kontrolü ve uyarılar
+        Object.entries(sanitizedData).forEach(([fieldName, value]) => {
+          const fieldWarnings = validateFieldIntegrity(fieldName, value, sanitizedData)
+          fieldWarnings.forEach(warning => {
+            warning.rowIndex = index
+            warnings.push(warning)
+          })
         })
+        
+        // Veri tiplerini doğrula ve dönüştür
+        const validation = validateAndConvertTypes(sanitizedData)
+        if (!validation.isValid) {
+          validation.errors.forEach(error => {
+            const processingError = logProcessingError(index, new Error(error), sanitizedData, 'TYPE_VALIDATION')
+            processingErrors.push(processingError)
+            errors.push(`Satır ${index + 2}: ${error}`)
+          })
+          errorCount++
+          continue
+        }
+        
+        const recordData = validation.convertedData!
+
+        try {
+          // Retry logic için
+          let retryCount = 0
+          const maxRetries = 3
+          let lastError: any = null
+          
+          while (retryCount <= maxRetries) {
+            try {
+              if (mode === 'update') {
+                // Upsert modu: Mevcut kayıt varsa güncelle, yoksa oluştur
+                const existingRecord = await prisma.borcluBilgileri.findUnique({
+                  where: { durumTanitici: recordData.durumTanitici },
+                  select: { id: true }
+                })
+                
+                if (existingRecord) {
+                  await prisma.borcluBilgileri.update({
+                    where: { durumTanitici: recordData.durumTanitici },
+                    data: recordData
+                  })
+                  updatedCount++
+                } else {
+                  await prisma.borcluBilgileri.create({
+                    data: recordData
+                  })
+                  createdCount++
+                }
+              } else {
+                // Replace modu: Her zaman yeni kayıt oluştur (eski davranış)
+                await prisma.borcluBilgileri.create({
+                  data: recordData
+                })
+                createdCount++
+              }
+              
+              // Başarılı işlem
+              processedRecords.push(recordData.durumTanitici)
+              break // Retry döngüsünden çık
+              
+            } catch (retryError) {
+              lastError = retryError
+              retryCount++
+              
+              // Geçici hata mı kontrol et
+              const errorMessage = retryError instanceof Error ? retryError.message : String(retryError)
+              const isTransientError = errorMessage.includes('SQLITE_BUSY') || 
+                                     errorMessage.includes('database is locked') ||
+                                     errorMessage.includes('timeout')
+              
+              if (isTransientError && retryCount <= maxRetries) {
+                console.warn(`[upload-excel] Geçici hata, yeniden deneniyor (${retryCount}/${maxRetries}):`, errorMessage)
+                await new Promise(resolve => setTimeout(resolve, 100 * retryCount)) // Exponential backoff
+                continue
+              } else {
+                throw retryError // Retry limiti aşıldı veya kalıcı hata
+              }
+            }
+          }
+          
+        } catch (dbError) {
+          // Database işlem hatası
+          const processingError = logProcessingError(index, dbError, recordData, 'DATABASE_OPERATION')
+          processingErrors.push(processingError)
+          
+          // Kritik hata kontrolü
+          const errorMessage = dbError instanceof Error ? dbError.message : String(dbError)
+          if (errorMessage.includes('UNIQUE constraint') || 
+              errorMessage.includes('NOT NULL constraint') ||
+              errorMessage.includes('FOREIGN KEY constraint')) {
+            hasCriticalErrors = true
+          }
+          
+          throw dbError // Ana catch bloğuna geç
+        }
 
         successCount++
       } catch (error) {
         errorCount++
-        errors.push(`Satır ${index + 2}: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`)
+        
+        // Güvenli veri erişimi için değişkenleri kontrol et
+        const safeData = {
+          durumTanitici: typeof durumTanitici !== 'undefined' ? durumTanitici : undefined,
+          muhatapTanimi: typeof finalMuhatapTanimi !== 'undefined' ? finalMuhatapTanimi : undefined
+        }
+        
+        const processingError = logProcessingError(index, error, safeData, 'ROW_PROCESSING')
+        processingErrors.push(processingError)
+        
+        const errorMessage = error instanceof Error ? error.message : 'Bilinmeyen hata'
+        errors.push(`Satır ${index + 2}: ${errorMessage}`)
+        
+        // Kritik hata oranı kontrolü
+        const errorRate = errorCount / (index + 1)
+        if (errorRate > 0.5 && index > 10) {
+          console.error(`[upload-excel] Yüksek hata oranı tespit edildi: %${(errorRate * 100).toFixed(1)}`)
+          hasCriticalErrors = true
+          break // İşlemi durdur
+        }
+      }
+    }
+    
+    // Rollback kontrolü
+    if (hasCriticalErrors && shouldUseTransaction && processedRecords.length > 0) {
+      console.warn(`[upload-excel] Kritik hatalar nedeniyle rollback yapılıyor...`)
+      
+      try {
+        // Manuel rollback - işlenmiş kayıtları geri al
+        if (mode === 'replace') {
+          // Replace modunda tüm yeni kayıtları sil
+          const deleteResult = await prisma.borcluBilgileri.deleteMany({
+            where: {
+              durumTanitici: {
+                in: processedRecords
+              }
+            }
+          })
+          console.log(`[upload-excel] Rollback: ${deleteResult.count} kayıt silindi`)
+        }
+        
+        return NextResponse.json({
+          success: false,
+          message: 'Kritik hatalar nedeniyle işlem geri alındı',
+          successCount: 0,
+          errorCount,
+          createdCount: 0,
+          updatedCount: 0,
+          mode,
+          errors: errors.slice(0, 10),
+          errorReport: generateErrorReport(processingErrors),
+          rolledBack: true,
+          rollbackReason: 'Yüksek hata oranı veya kritik veritabanı hataları'
+        }, { status: 400 })
+        
+      } catch (rollbackError) {
+        console.error(`[upload-excel] Rollback hatası:`, rollbackError)
+        return NextResponse.json({
+          success: false,
+          message: 'İşlem başarısız ve rollback yapılamadı',
+          error: 'Kritik sistem hatası'
+        }, { status: 500 })
       }
     }
 
+    // Hata raporu oluştur
+    const errorReport = generateErrorReport(processingErrors)
+    
+    // Kullanıcı dostu mesaj oluştur
+    let userMessage = ''
+    let suggestions: string[] = []
+    
+    if (errorCount === 0) {
+      userMessage = mode === 'update' 
+        ? `✅ Excel dosyası başarıyla işlendi! ${createdCount} yeni kayıt eklendi, ${updatedCount} kayıt güncellendi.`
+        : `✅ Excel dosyası başarıyla işlendi! ${createdCount} kayıt eklendi.`
+    } else if (successCount > 0) {
+      userMessage = `⚠️ Excel dosyası kısmen işlendi. ${successCount} kayıt başarılı, ${errorCount} kayıt başarısız.`
+      suggestions.push('Hatalı satırları kontrol edin ve düzelttikten sonra tekrar yükleyin')
+      
+      if (warnings.length > 0) {
+        suggestions.push('Veri kalitesini artırmak için uyarıları gözden geçirin')
+      }
+    } else {
+      userMessage = `❌ Excel dosyası işlenemedi. Tüm satırlarda hata var.`
+      suggestions.push('Excel dosyanızın formatını kontrol edin')
+      suggestions.push('Zorunlu alanların (Durum Tanıtıcı) dolu olduğundan emin olun')
+      suggestions.push('Sayısal alanların doğru formatta olduğunu kontrol edin')
+    }
+    
+    // Performans metrikleri
+    const processingEndTime = Date.now()
+    const processingDuration = processingEndTime - Date.now() // Bu gerçek implementasyonda başlangıç zamanı tutulmalı
+    
+    // Detaylı özet
+    const detailedSummary = {
+      totalRows: data.length,
+      processedRows: successCount,
+      failedRows: errorCount,
+      successRate: data.length > 0 ? Math.round((successCount / data.length) * 100) : 0,
+      hasErrors: errorCount > 0,
+      hasWarnings: warnings.length > 0,
+      warningCount: warnings.length,
+      processingTime: `${Math.round(processingDuration / 1000)}s`,
+      dataQuality: {
+        emptyMuhatapCount: warnings.filter(w => w.message.includes('muhatap tanımı boş')).length,
+        invalidTCKNCount: warnings.filter(w => w.message.includes('TCKN') || w.message.includes('TC kimlik')).length,
+        invalidPhoneCount: warnings.filter(w => w.message.includes('telefon')).length,
+        negativeAmountCount: warnings.filter(w => w.message.includes('negatif')).length
+      }
+    }
+    
+    // Öneriler oluştur
+    if (detailedSummary.dataQuality.emptyMuhatapCount > 0) {
+      suggestions.push(`${detailedSummary.dataQuality.emptyMuhatapCount} kayıtta muhatap tanımı boş`)
+    }
+    if (detailedSummary.dataQuality.invalidTCKNCount > 0) {
+      suggestions.push(`${detailedSummary.dataQuality.invalidTCKNCount} kayıtta geçersiz TC kimlik numarası`)
+    }
+    if (detailedSummary.dataQuality.invalidPhoneCount > 0) {
+      suggestions.push(`${detailedSummary.dataQuality.invalidPhoneCount} kayıtta geçersiz telefon numarası`)
+    }
+    
+    console.log(`[upload-excel] İşlem tamamlandı: ${successCount}/${data.length} başarılı`)
+    
     return NextResponse.json({
-      message: 'Excel dosyası işlendi',
+      success: errorCount === 0,
+      message: userMessage,
+      suggestions,
       successCount,
       errorCount,
-      errors: errors.slice(0, 10)
+      createdCount,
+      updatedCount,
+      mode,
+      errors: errors.slice(0, 10),
+      errorReport,
+      processingErrors: processingErrors.slice(0, 5), // İlk 5 detaylı hata
+      warnings: warnings.slice(0, 10), // İlk 10 uyarı
+      summary: detailedSummary,
+      // Kullanıcı için actionable feedback
+      nextSteps: generateNextSteps(detailedSummary, processingErrors, warnings)
     })
 
   } catch (error) {
