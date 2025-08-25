@@ -27,6 +27,8 @@ model BorcluBilgileri {
   il                   String?
   ilce                 String?
   telefon              String?
+  telefon2             String?  @map("telefon_2")
+  telefon3             String?  @map("telefon_3")
   telefonAboneGrubu    String?  @map("telefon_abone_grubu")
   asilAlacak           Float?   @map("asil_alacak")
   takipCikisMiktari    Float?   @map("takip_cikis_miktari")
@@ -72,4 +74,25 @@ model OdemeSozu {
   borclu           BorcluBilgileri  @relation("BorcluOdemeSozleri", fields: [borcluId], references: [id], onDelete: Cascade)
 
   @@map("odeme_sozleri")
+}
+
+model WhatsAppMessage {
+  id               String    @id @default(cuid())
+  durumTanitici    String    @map("durum_tanitici")
+  phoneNumber      String    @map("phone_number")
+  message          String    @map("message")
+  status           String    @default("pending") @map("status") // pending, sent, delivered, read, failed
+  sentAt           DateTime? @map("sent_at")
+  deliveredAt      DateTime? @map("delivered_at")
+  readAt           DateTime? @map("read_at")
+  errorMessage     String?   @map("error_message")
+  messageId        String?   @map("message_id")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@index([durumTanitici])
+  @@index([phoneNumber])
+  @@index([status])
+  @@index([createdAt])
+  @@map("whatsapp_messages")
 }
