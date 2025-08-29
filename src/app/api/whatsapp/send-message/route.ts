@@ -1,724 +1,339 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { Client, LocalAuth, MessageMedia } from 'whatsapp-web.js'
-import QRCode from 'qrcode'
-import { prisma } from '@/lib/prisma'
-import fs from 'fs'
-import path from 'path'
+import { NextRequest, NextResponse } from 'next/server';
+import makeWASocket, { DisconnectReason, useMultiFileAuthState, WASocket } from '@whiskeysockets/baileys';
+import { Boom } from '@hapi/boom';
+import QRCode from 'qrcode';
+import path from 'path';
+import fs from 'fs';
 
-// WhatsApp client instance
-let client: Client | null = null
-let isClientReady = false
-let qrCodeData: string | null = null
+let globalSocket: WASocket | null = null;
+let isConnecting = false;
+let qrCodeData: string | null = null;
+let isReady = false;
+let lastConnectionAttempt = 0;
+let connectionRetries = 0;
+let connectionPromise: Promise<{ socket: WASocket; qr?: string }> | null = null;
+const CONNECTION_COOLDOWN = 30000; // 30 seconds
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 5000; // 5 seconds
 
-// Initialize WhatsApp client
-function initializeClient() {
-  if (client) return client
-
-  console.log('Creating new WhatsApp client...')
-  
-  const sessionPath = process.env.WHATSAPP_SESSION_PATH || './.wwebjs_auth'
-  
-  client = new Client({
-    authStrategy: new LocalAuth({
-      clientId: "whatsapp-client",
-      dataPath: sessionPath
-    }),
-    puppeteer: {
-      headless: true, // Set to true for Docker container
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu',
-        '--disable-web-security',
-        '--disable-features=VizDisplayCompositor',
-        '--disable-background-timer-throttling',
-        '--disable-backgrounding-occluded-windows',
-        '--disable-renderer-backgrounding'
-      ]
-    }
-  })
-
-  client.on('qr', async (qr) => {
-    console.log('QR Code received, generating data URL...')
-    try {
-      qrCodeData = await QRCode.toDataURL(qr)
-      console.log('QR Code generated successfully')
-    } catch (error) {
-      console.error('QR Code generation error:', error)
-    }
-  })
-
-  client.on('ready', () => {
-    console.log('WhatsApp client is ready!')
-    isClientReady = true
-    qrCodeData = null
-  })
-
-  client.on('authenticated', () => {
-    console.log('WhatsApp client authenticated')
-  })
-
-  client.on('auth_failure', (msg) => {
-    console.error('Authentication failed:', msg)
-    isClientReady = false
-  })
-
-  client.on('disconnected', (reason) => {
-    console.log('WhatsApp client disconnected:', reason)
-    isClientReady = false
-    qrCodeData = null
-    
-    // Don't immediately set client to null, let it try to reconnect
-    setTimeout(() => {
-      if (!isClientReady) {
-        console.log('Client still not ready after disconnect, resetting...')
-        client = null
-      }
-    }, 5000)
-  })
-
-  client.initialize()
-  return client
+// Connection state enum
+enum ConnectionState {
+  DISCONNECTED = 'disconnected',
+  CONNECTING = 'connecting',
+  CONNECTED = 'connected',
+  ERROR = 'error'
 }
 
-// Format phone number for WhatsApp
-function formatPhoneNumber(phone: string): string {
-  // Remove all non-digit characters
-  let cleaned = phone.replace(/\D/g, '')
-  
-  // If starts with 0, replace with 90 (Turkey)
-  if (cleaned.startsWith('0')) {
-    cleaned = '90' + cleaned.substring(1)
-  }
-  
-  // If doesn't start with country code, add Turkey code
-  if (!cleaned.startsWith('90')) {
-    cleaned = '90' + cleaned
-  }
-  
-  return cleaned + '@c.us'
-}
+let connectionState: ConnectionState = ConnectionState.DISCONNECTED;
 
-// GET - Check WhatsApp connection status and get QR code if needed
-export async function GET() {
+// Auth state directory - use the directory created in Docker
+const AUTH_DIR = path.join(process.cwd(), '.wwebjs_auth');
+
+// Ensure auth directory exists
+if (!fs.existsSync(AUTH_DIR)) {
   try {
-    console.log('WhatsApp status check - Client exists:', !!client)
-    console.log('WhatsApp status check - Is ready:', isClientReady)
-    console.log('WhatsApp status check - Has QR:', !!qrCodeData)
-    
-    if (!client) {
-      console.log('Initializing WhatsApp client...')
-      initializeClient()
-    } else if (!isClientReady && !qrCodeData) {
-      console.log('Client exists but not ready and no QR. Reinitializing...')
-      // Reset client and reinitialize
-      if (client) {
-        try {
-          await client.destroy()
-        } catch (destroyError) {
-          console.log('Error destroying client:', destroyError)
-        }
-      }
-      client = null
-      isClientReady = false
-      qrCodeData = null
-      initializeClient()
-    }
+    fs.mkdirSync(AUTH_DIR, { recursive: true });
+  } catch (error) {
+    console.warn('Could not create auth directory:', error);
+    // Directory might already exist or have permission issues
+  }
+}
 
-    // Wait a bit for QR code generation if client was just initialized
-    if (!isClientReady && !qrCodeData && client) {
-      await new Promise(resolve => setTimeout(resolve, 2000))
+async function initializeWhatsApp(): Promise<{ socket: WASocket; qr?: string }> {
+  // Return existing connection promise if already connecting
+  if (connectionPromise && isConnecting) {
+    console.log('Connection already in progress, returning existing promise');
+    return connectionPromise;
+  }
+  
+  const now = Date.now();
+  
+  // Prevent rapid reconnection attempts
+  if (now - lastConnectionAttempt < CONNECTION_COOLDOWN) {
+    throw new Error('Connection attempt too soon. Please wait.');
+  }
+  
+  // Check retry limit
+  if (connectionRetries >= MAX_RETRIES) {
+    connectionState = ConnectionState.ERROR;
+    throw new Error('Maximum connection retries exceeded. Please try again later.');
+  }
+  
+  lastConnectionAttempt = now;
+  isConnecting = true;
+  connectionState = ConnectionState.CONNECTING;
+  qrCodeData = null;
+  isReady = false;
+  connectionRetries++;
+  
+  // Create and store the connection promise
+  connectionPromise = createConnection();
+  
+  try {
+    const result = await connectionPromise;
+    return result;
+  } catch (error) {
+    connectionPromise = null;
+    throw error;
+  }
+}
+
+async function createConnection(): Promise<{ socket: WASocket; qr?: string }> {
+
+  try {
+    console.log('Initializing WhatsApp connection with Baileys...');
+    
+    // Clean up existing socket if any
+    if (globalSocket) {
+      try {
+        await globalSocket.logout();
+      } catch (error) {
+        console.warn('Error during socket cleanup:', error);
+      }
+      globalSocket = null;
     }
+    
+    // Load auth state
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+    
+    // Create socket with improved configuration
+    const socket = makeWASocket({
+      auth: state,
+      printQRInTerminal: false,
+      browser: ['Borç Sorgulama', 'Chrome', '1.0.0'],
+      markOnlineOnConnect: false,
+      generateHighQualityLinkPreview: true,
+      syncFullHistory: false,
+      defaultQueryTimeoutMs: 60000,
+      connectTimeoutMs: 60000,
+       keepAliveIntervalMs: 30000,
+       retryRequestDelayMs: 250,
+       maxMsgRetryCount: 5
+    });
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        isConnecting = false;
+        reject(new Error('Connection timeout'));
+      }, 120000); // 2 minutes timeout
+
+      // Handle QR code generation
+      socket.ev.on('connection.update', async (update) => {
+        const { connection, lastDisconnect, qr } = update;
+        
+        console.log('Connection update:', { connection, qr: !!qr });
+        
+        if (qr) {
+          try {
+            qrCodeData = await QRCode.toDataURL(qr);
+            console.log('QR code generated successfully');
+          } catch (error) {
+            console.error('Error generating QR code:', error);
+          }
+        }
+        
+        if (connection === 'close') {
+          clearTimeout(timeout);
+          isConnecting = false;
+          isReady = false;
+          
+          const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
+          const shouldReconnect = statusCode !== DisconnectReason.loggedOut && 
+                                 statusCode !== DisconnectReason.badSession &&
+                                 connectionRetries < MAX_RETRIES;
+          
+          console.log('Connection closed:', {
+            error: lastDisconnect?.error?.message,
+            statusCode,
+            shouldReconnect,
+            retries: connectionRetries
+          });
+          
+          if (shouldReconnect) {
+            // Auto-reconnect after a delay with exponential backoff
+            const delay = RETRY_DELAY * Math.pow(2, connectionRetries - 1);
+            console.log(`Retrying connection in ${delay}ms (attempt ${connectionRetries}/${MAX_RETRIES})`);
+            connectionState = ConnectionState.ERROR;
+            connectionPromise = null; // Clear the promise for retry
+            setTimeout(() => {
+              initializeWhatsApp().catch(console.error);
+            }, delay);
+          } else {
+            // Reset retries if we're not reconnecting
+            connectionRetries = 0;
+            connectionState = ConnectionState.DISCONNECTED;
+            connectionPromise = null;
+          }
+          
+          reject(new Error(`Connection closed: ${lastDisconnect?.error?.message || 'Unknown error'}`));
+        } else if (connection === 'open') {
+          clearTimeout(timeout);
+          isConnecting = false;
+          isReady = true;
+          connectionState = ConnectionState.CONNECTED;
+          qrCodeData = null;
+          globalSocket = socket;
+          connectionRetries = 0; // Reset retries on successful connection
+          connectionPromise = null; // Clear the promise
+          
+          console.log('WhatsApp connected successfully!');
+          resolve({ socket });
+        }
+      });
+      
+      // Save credentials when updated
+      socket.ev.on('creds.update', saveCreds);
+      
+      // Handle messages
+      socket.ev.on('messages.upsert', async (m) => {
+        console.log('Received messages:', m.messages.length);
+      });
+    });
+    
+  } catch (error) {
+    isConnecting = false;
+    console.error('Error initializing WhatsApp:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      retries: connectionRetries
+    });
+    
+    // Reset connection state on critical errors
+    if (error instanceof Error && 
+        (error.message.includes('ECONNREFUSED') || 
+         error.message.includes('ENOTFOUND') ||
+         error.message.includes('timeout'))) {
+      connectionRetries = 0;
+    }
+    
+    throw error;
+  }
+}
+
+// Initialize on startup
+if (!globalSocket && !isConnecting) {
+  initializeWhatsApp().catch(console.error);
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const statusMessage = {
+      [ConnectionState.CONNECTED]: 'WhatsApp is ready',
+      [ConnectionState.CONNECTING]: 'WhatsApp is connecting...',
+      [ConnectionState.DISCONNECTED]: 'WhatsApp is disconnected',
+      [ConnectionState.ERROR]: 'WhatsApp connection error'
+    }[connectionState] || 'WhatsApp status unknown';
 
     return NextResponse.json({
-      success: true,
-      isReady: isClientReady,
+      success: connectionState === ConnectionState.CONNECTED,
+      isReady,
+      connectionState,
       qrCode: qrCodeData,
-      message: isClientReady ? 'WhatsApp is connected' : qrCodeData ? 'Scan QR code to connect' : 'WhatsApp is initializing...',
+      message: statusMessage,
       debug: {
-        clientExists: !!client,
-        isReady: isClientReady,
-        hasQR: !!qrCodeData
+        hasSocket: !!globalSocket,
+        isConnecting,
+        isReady,
+        hasQR: !!qrCodeData,
+        lastAttempt: lastConnectionAttempt,
+        retries: connectionRetries,
+        maxRetries: MAX_RETRIES,
+        hasConnectionPromise: !!connectionPromise
       }
-    })
+    });
   } catch (error) {
-    console.error('WhatsApp status check error:', error)
+    console.error('Error in GET /api/whatsapp/send-message:', error);
     return NextResponse.json(
-      { success: false, error: 'WhatsApp status check failed', details: error instanceof Error ? error.message : 'Unknown error' },
+      { 
+        success: false, 
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        connectionState: ConnectionState.ERROR
+      },
       { status: 500 }
-    )
+    );
   }
 }
 
-// POST - Send WhatsApp message
 export async function POST(request: NextRequest) {
   try {
-    const { phoneNumber, message, debtorName, durumTanitici, recipients, files } = await request.json()
+    const { phoneNumber, message } = await request.json();
     
-    console.log('WhatsApp API called with:', {
-      phoneNumber: phoneNumber ? 'provided' : 'missing',
-      message: message ? 'provided' : 'missing',
-      filesCount: files ? files.length : 0,
-      recipients: recipients ? recipients.length : 0
-    })
-
-    if (!phoneNumber && !recipients) {
+    if (!phoneNumber || !message) {
       return NextResponse.json(
-        { success: false, error: 'Telefon numarası veya alıcı listesi gerekli' },
+        { success: false, error: 'Phone number and message are required' },
         { status: 400 }
-      )
+      );
     }
-
-    if (!message) {
-      return NextResponse.json(
-        { success: false, error: 'Mesaj gerekli' },
-        { status: 400 }
-      )
-    }
-
-    // Initialize client if not exists
-    if (!client) {
-      initializeClient()
-    }
-
-    // Check if client is ready
-    if (!isClientReady) {
+    
+    // Check if WhatsApp is ready
+    if (!globalSocket || !isReady) {
+      // Try to initialize if not connecting
+      if (!isConnecting) {
+        initializeWhatsApp().catch(console.error);
+      }
+      
       return NextResponse.json(
         { 
           success: false, 
-          error: 'WhatsApp bağlantısı hazır değil. Lütfen QR kodu ile giriş yapın.',
-          qrCode: qrCodeData
+          error: 'WhatsApp is not ready',
+          qrCode: qrCodeData,
+          message: 'Please scan QR code or wait for connection'
         },
         { status: 503 }
-      )
+      );
     }
-
-    // Handle bulk messaging
-    if (recipients && Array.isArray(recipients)) {
-      const results = []
-      
-      for (const recipient of recipients) {
-        const { phoneNumber: recipientPhone, durumTanitici: recipientDurumTanitici, name } = recipient
-        
-        if (!recipientPhone) {
-          results.push({
-            durumTanitici: recipientDurumTanitici,
-            success: false,
-            error: 'Telefon numarası bulunamadı'
-          })
-          continue
-        }
-
-        // Create message record in database
-        const messageRecord = await prisma.whatsAppMessage.create({
-          data: {
-            durumTanitici: recipientDurumTanitici,
-            phoneNumber: recipientPhone,
-            message: message,
-            status: 'pending'
-          }
-        })
-
-        try {
-          // Format phone number
-          const formattedNumber = formatPhoneNumber(recipientPhone)
-
-          // Check if client is still ready before proceeding
-          if (!client || !isClientReady) {
-            await prisma.whatsAppMessage.update({
-              where: { id: messageRecord.id },
-              data: {
-                status: 'failed',
-                errorMessage: 'WhatsApp bağlantısı kesildi'
-              }
-            })
-            
-            results.push({
-              durumTanitici: recipientDurumTanitici,
-              success: false,
-              error: 'WhatsApp bağlantısı kesildi'
-            })
-            continue
-          }
-
-          // Check if number is registered on WhatsApp with error handling
-          let isRegistered = false
-          try {
-            isRegistered = await client.isRegisteredUser(formattedNumber)
-          } catch (registrationError) {
-            console.error('Error checking if user is registered:', registrationError)
-            
-            // If session is closed, reset client and stop bulk operation
-            if (registrationError instanceof Error && registrationError.message.includes('Session closed')) {
-              console.log('Session closed detected during bulk operation, resetting client...')
-              isClientReady = false
-              client = null
-              
-              await prisma.whatsAppMessage.update({
-                where: { id: messageRecord.id },
-                data: {
-                  status: 'failed',
-                  errorMessage: 'WhatsApp oturumu kapandı'
-                }
-              })
-              
-              results.push({
-                durumTanitici: recipientDurumTanitici,
-                success: false,
-                error: 'WhatsApp oturumu kapandı'
-              })
-              
-              // Return early to stop bulk operation
-              return NextResponse.json({
-                success: false,
-                error: 'WhatsApp oturumu kapandı. Lütfen yeniden bağlanın.',
-                results,
-                needsReconnection: true
-              }, { status: 503 })
-            }
-            
-            // For other errors, assume number is registered and try to send
-            console.log('Assuming number is registered due to check error')
-            isRegistered = true
-          }
-          
-          if (!isRegistered) {
-            await prisma.whatsAppMessage.update({
-              where: { id: messageRecord.id },
-              data: {
-                status: 'failed',
-                errorMessage: 'Bu telefon numarası WhatsApp\'ta kayıtlı değil'
-              }
-            })
-            
-            results.push({
-              durumTanitici: recipientDurumTanitici,
-              success: false,
-              error: 'Bu telefon numarası WhatsApp\'ta kayıtlı değil'
-            })
-            continue
-          }
-
-          // Prepare message with debtor info
-          const fullMessage = name 
-            ? `Sayın ${name},\n\n${message}`
-            : message
-
-          // Send message
-          let sentMessage
-          if (files && files.length > 0) {
-            console.log('Files to send:', files.length)
-            // Send files with message
-            for (let i = 0; i < files.length; i++) {
-              const file = files[i]
-              try {
-                console.log('Processing file:', file.filename, 'Type:', file.mimetype)
-                
-                // Try alternative approach: save to temp file first
-                let base64Data = file.data
-                if (base64Data.includes(',')) {
-                  base64Data = base64Data.split(',')[1]
-                }
-                
-                // Validate base64 data
-                if (!base64Data || base64Data.length === 0) {
-                  throw new Error('Invalid base64 data')
-                }
-                
-                // Create temp directory if it doesn't exist
-                const tempDir = process.env.UPLOAD_TEMP_PATH || path.join(process.cwd(), 'temp')
-                if (!fs.existsSync(tempDir)) {
-                  fs.mkdirSync(tempDir, { recursive: true })
-                }
-                
-                // Save file temporarily
-                const tempFileName = `temp_${Date.now()}_${file.filename}`
-                const tempFilePath = path.join(tempDir, tempFileName)
-                
-                try {
-                  // Write base64 data to temp file
-                  fs.writeFileSync(tempFilePath, base64Data, 'base64')
-                  
-                  // Create MessageMedia from file
-                  const media = MessageMedia.fromFilePath(tempFilePath)
-                  
-                  console.log('Media object created from file:', {
-                    mimetype: media.mimetype,
-                    filename: file.filename,
-                    tempPath: tempFilePath
-                  })
-                  
-                  console.log('Sending media message...')
-                  const mediaMessage = await client!.sendMessage(formattedNumber, media, {
-                    caption: i === 0 ? fullMessage : undefined
-                  })
-                  
-                  // Clean up temp file
-                  fs.unlinkSync(tempFilePath)
-                  
-                  console.log('Media message sent successfully, temp file cleaned up')
-                  if (!sentMessage) sentMessage = mediaMessage
-                } catch (tempFileError) {
-                  // Clean up temp file if it exists
-                  if (fs.existsSync(tempFilePath)) {
-                    fs.unlinkSync(tempFilePath)
-                  }
-                  throw tempFileError
-                }
-              } catch (fileError) {
-                console.error('File send error for', file.filename, ':', fileError)
-                console.error('Error details:', {
-                  message: fileError instanceof Error ? fileError.message : 'Unknown error',
-                  stack: fileError instanceof Error ? fileError.stack : undefined,
-                  fileInfo: {
-                    name: file.filename,
-                    type: file.mimetype,
-                    dataLength: file.data?.length || 0
-                  }
-                })
-                // Continue with next file or send text message
-              }
-            }
-            // If no files were sent successfully, send text message
-            if (!sentMessage) {
-              console.log('No files sent successfully, sending text message')
-              sentMessage = await client!.sendMessage(formattedNumber, fullMessage)
-            }
-          } else {
-            sentMessage = await client!.sendMessage(formattedNumber, fullMessage)
-          }
-          
-          // Update message record as sent
-          await prisma.whatsAppMessage.update({
-            where: { id: messageRecord.id },
-            data: {
-              status: 'sent',
-              sentAt: new Date(),
-              messageId: sentMessage.id._serialized
-            }
-          })
-
-          results.push({
-            durumTanitici: recipientDurumTanitici,
-            success: true,
-            messageId: sentMessage.id._serialized
-          })
-
-        } catch (error) {
-          console.error(`Error sending message to ${recipientPhone}:`, error)
-          
-          let errorMessage = error instanceof Error ? error.message : 'Bilinmeyen hata'
-          
-          // Handle session closed error
-          if (error instanceof Error && error.message.includes('Session closed')) {
-            console.log('Session closed detected during message send, resetting client...')
-            isClientReady = false
-            client = null
-            errorMessage = 'WhatsApp oturumu kapandı'
-          }
-          
-          // Update message record as failed
-          await prisma.whatsAppMessage.update({
-            where: { id: messageRecord.id },
-            data: {
-              status: 'failed',
-              errorMessage: errorMessage
-            }
-          })
-
-          results.push({
-            durumTanitici: recipientDurumTanitici,
-            success: false,
-            error: errorMessage
-          })
-          
-          // If session closed, stop bulk operation
-          if (error instanceof Error && error.message.includes('Session closed')) {
-            return NextResponse.json({
-              success: false,
-              error: 'WhatsApp oturumu kapandı. Lütfen yeniden bağlanın.',
-              results,
-              needsReconnection: true
-            }, { status: 503 })
-          }
-        }
-      }
-
-      return NextResponse.json({
-        success: true,
-        message: 'Toplu mesaj gönderimi tamamlandı',
-        results
-      })
-    }
-
-    // Handle single message
-    if (!durumTanitici) {
+    
+    // Format phone number
+    const formattedNumber = phoneNumber.replace(/[^0-9]/g, '');
+    const jid = formattedNumber.includes('@') ? formattedNumber : `${formattedNumber}@s.whatsapp.net`;
+    
+    // Check if number exists on WhatsApp
+    const onWhatsAppResult = await globalSocket.onWhatsApp(jid);
+    const [result] = onWhatsAppResult || [];
+    if (!result?.exists) {
       return NextResponse.json(
-        { success: false, error: 'Durum tanıtıcı gerekli' },
+        { success: false, error: 'Phone number is not registered on WhatsApp' },
         { status: 400 }
-      )
+      );
     }
+    
+    // Send message
+    const sentMessage = await globalSocket.sendMessage(result.jid, { text: message });
 
-    // Create message record in database
-    const messageRecord = await prisma.whatsAppMessage.create({
-      data: {
-        durumTanitici,
-        phoneNumber,
-        message,
-        status: 'pending'
-      }
-    })
-
-    try {
-      // Format phone number
-      const formattedNumber = formatPhoneNumber(phoneNumber)
-
-      // Check if client is still ready before proceeding
-      if (!client || !isClientReady) {
-        await prisma.whatsAppMessage.update({
-          where: { id: messageRecord.id },
-          data: {
-            status: 'failed',
-            errorMessage: 'WhatsApp bağlantısı kesildi. Lütfen yeniden bağlanın.'
-          }
-        })
-        
-        return NextResponse.json(
-          { 
-            success: false, 
-            error: 'WhatsApp bağlantısı kesildi. Lütfen yeniden bağlanın.',
-            qrCode: qrCodeData
-          },
-          { status: 503 }
-        )
-      }
-
-      // Check if number is registered on WhatsApp with error handling
-      let isRegistered = false
-      try {
-        isRegistered = await client.isRegisteredUser(formattedNumber)
-      } catch (registrationError) {
-        console.error('Error checking if user is registered:', registrationError)
-        
-        // If session is closed, reset client
-        if (registrationError instanceof Error && registrationError.message.includes('Session closed')) {
-          console.log('Session closed detected, resetting client...')
-          isClientReady = false
-          client = null
-          
-          await prisma.whatsAppMessage.update({
-            where: { id: messageRecord.id },
-            data: {
-              status: 'failed',
-              errorMessage: 'WhatsApp oturumu kapandı. Lütfen yeniden bağlanın.'
-            }
-          })
-          
-          return NextResponse.json(
-            { 
-              success: false, 
-              error: 'WhatsApp oturumu kapandı. Lütfen yeniden bağlanın.',
-              needsReconnection: true
-            },
-            { status: 503 }
-          )
-        }
-        
-        // For other errors, assume number is registered and try to send
-        console.log('Assuming number is registered due to check error')
-        isRegistered = true
-      }
-      
-      if (!isRegistered) {
-        await prisma.whatsAppMessage.update({
-          where: { id: messageRecord.id },
-          data: {
-            status: 'failed',
-            errorMessage: 'Bu telefon numarası WhatsApp\'ta kayıtlı değil'
-          }
-        })
-        
-        return NextResponse.json(
-          { success: false, error: 'Bu telefon numarası WhatsApp\'ta kayıtlı değil' },
-          { status: 400 }
-        )
-      }
-
-      // Prepare message with debtor info
-      const fullMessage = debtorName 
-        ? `Sayın ${debtorName},\n\n${message}`
-        : message
-
-      // Send message
-      let sentMessage
-      if (files && files.length > 0) {
-        console.log('Files to send:', files.length)
-        // Send files with message
-        for (let i = 0; i < files.length; i++) {
-          const file = files[i]
-          try {
-            console.log('Processing file:', file.filename, 'Type:', file.mimetype)
-            
-            // Try alternative approach: save to temp file first
-            let base64Data = file.data
-            if (base64Data.includes(',')) {
-              base64Data = base64Data.split(',')[1]
-            }
-            
-            // Validate base64 data
-            if (!base64Data || base64Data.length === 0) {
-              throw new Error('Invalid base64 data')
-            }
-            
-            // Create temp directory if it doesn't exist
-            const tempDir = process.env.UPLOAD_TEMP_PATH || path.join(process.cwd(), 'temp')
-            if (!fs.existsSync(tempDir)) {
-              fs.mkdirSync(tempDir, { recursive: true })
-            }
-            
-            // Save file temporarily
-            const tempFileName = `temp_${Date.now()}_${file.filename}`
-            const tempFilePath = path.join(tempDir, tempFileName)
-            
-            try {
-              // Write base64 data to temp file
-              fs.writeFileSync(tempFilePath, base64Data, 'base64')
-              
-              // Create MessageMedia from file
-              const media = MessageMedia.fromFilePath(tempFilePath)
-              
-              console.log('Media object created from file:', {
-                mimetype: media.mimetype,
-                filename: file.filename,
-                tempPath: tempFilePath
-              })
-              
-              console.log('Sending media message...')
-              const mediaMessage = await client!.sendMessage(formattedNumber, media, {
-                caption: i === 0 ? fullMessage : undefined
-              })
-              
-              // Clean up temp file
-              fs.unlinkSync(tempFilePath)
-              
-              console.log('Media message sent successfully, temp file cleaned up')
-              if (!sentMessage) sentMessage = mediaMessage
-            } catch (tempFileError) {
-              // Clean up temp file if it exists
-              if (fs.existsSync(tempFilePath)) {
-                fs.unlinkSync(tempFilePath)
-              }
-              throw tempFileError
-            }
-          } catch (fileError) {
-            console.error('File send error for', file.filename, ':', fileError)
-            console.error('Error details:', {
-              message: fileError instanceof Error ? fileError.message : 'Unknown error',
-              stack: fileError instanceof Error ? fileError.stack : undefined,
-              fileInfo: {
-                name: file.filename,
-                type: file.mimetype,
-                dataLength: file.data?.length || 0
-              }
-            })
-            // Continue with next file or send text message
-          }
-        }
-        // If no files were sent successfully, send text message
-        if (!sentMessage) {
-          console.log('No files sent successfully, sending text message')
-          sentMessage = await client!.sendMessage(formattedNumber, fullMessage)
-        }
-      } else {
-        sentMessage = await client!.sendMessage(formattedNumber, fullMessage)
-      }
-      
-      // Update message record as sent
-      await prisma.whatsAppMessage.update({
-        where: { id: messageRecord.id },
-        data: {
-          status: 'sent',
-          sentAt: new Date(),
-          messageId: sentMessage.id._serialized
-        }
-      })
-
-      return NextResponse.json({
-        success: true,
-        message: 'Mesaj başarıyla gönderildi',
-        sentTo: formattedNumber,
-        sentMessage: fullMessage,
-        messageId: sentMessage.id._serialized
-      })
-
-    } catch (error) {
-      console.error('WhatsApp message send error:', error)
-      
-      let errorMessage = error instanceof Error ? error.message : 'Bilinmeyen hata'
-      let statusCode = 500
-      let needsReconnection = false
-      
-      // Handle session closed error
-      if (error instanceof Error && error.message.includes('Session closed')) {
-        console.log('Session closed detected during single message send, resetting client...')
-        isClientReady = false
-        client = null
-        errorMessage = 'WhatsApp oturumu kapandı. Lütfen yeniden bağlanın.'
-        statusCode = 503
-        needsReconnection = true
-      }
-      
-      // Update message record as failed
-      await prisma.whatsAppMessage.update({
-        where: { id: messageRecord.id },
-        data: {
-          status: 'failed',
-          errorMessage: errorMessage
-        }
-      })
-
+    if (!sentMessage) {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: errorMessage,
-          needsReconnection: needsReconnection
-        },
-        { status: statusCode }
-      )
+        { success: false, error: 'Failed to send message' },
+        { status: 500 }
+      );
     }
-
-  } catch (error) {
-    console.error('WhatsApp API error:', error)
-    return NextResponse.json(
-      { success: false, error: 'API hatası oluştu' },
-      { status: 500 }
-    )
-  }
-}
-
-// DELETE - Disconnect WhatsApp client
-export async function DELETE() {
-  try {
-    if (client) {
-      await client.destroy()
-      client = null
-      isClientReady = false
-      qrCodeData = null
-    }
-
+    
+    console.log('Message sent successfully:', sentMessage.key.id);
+    
     return NextResponse.json({
       success: true,
-      message: 'WhatsApp bağlantısı kesildi'
-    })
+      messageId: sentMessage.key.id,
+      message: 'Message sent successfully'
+    });
+    
   } catch (error) {
-    console.error('WhatsApp disconnect error:', error)
+    console.error('Error sending WhatsApp message:', error);
     return NextResponse.json(
-      { success: false, error: 'Bağlantı kesilirken hata oluştu' },
+      { 
+        success: false, 
+        error: 'Failed to send message',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
-    )
+    );
   }
 }
+
+// Cleanup function
+process.on('SIGINT', async () => {
+  if (globalSocket) {
+    await globalSocket.logout();
+  }
+  process.exit(0);
+});

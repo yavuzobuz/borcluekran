@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,12 @@ import { Search, FileText, Calendar, TrendingUp, Upload, FileImage, FileIcon, X 
 import Link from 'next/link'
 import { Header } from '@/components/header'
 import { WhatsAppMessageTemplates } from '@/components/whatsapp-message-templates'
+
+interface FileBase64 {
+  data: string | ArrayBuffer | null
+  filename: string
+  type: string
+}
 
 interface Borclu {
   // Prisma schema'ya uygun field'lar
@@ -69,7 +75,7 @@ interface Borclu {
   hasActivePaymentPromise?: boolean
 }
 
-export default function BorclularPage() {
+function BorclularContent() {
   const searchParams = useSearchParams()
   const [borclular, setBorclular] = useState<Borclu[]>([])
   const [filteredBorclular, setFilteredBorclular] = useState<Borclu[]>([])
@@ -147,15 +153,15 @@ export default function BorclularPage() {
     await checkWhatsAppStatus()
   }
 
-  const convertFilesToBase64 = async (files: File[]): Promise<any[]> => {
+  const convertFilesToBase64 = async (files: File[]): Promise<FileBase64[]> => {
     const filePromises = files.map(file => {
-      return new Promise((resolve, reject) => {
+      return new Promise<FileBase64>((resolve, reject) => {
         const reader = new FileReader()
         reader.onload = () => {
           resolve({
             data: reader.result,
             filename: file.name,
-            mimetype: file.type
+            type: file.type
           })
         }
         reader.onerror = reject
@@ -891,5 +897,13 @@ export default function BorclularPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function BorclularPage() {
+  return (
+    <Suspense fallback={<div>Yükleniyor...</div>}>
+      <BorclularContent />
+    </Suspense>
   )
 }

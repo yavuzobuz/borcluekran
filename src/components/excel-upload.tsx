@@ -67,7 +67,7 @@ export function ExcelUpload() {
       } else {
         setError(data.error || 'Dosya yüklenirken hata oluştu')
       }
-    } catch (err) {
+    } catch {
       setError('Dosya yüklenirken hata oluştu')
     } finally {
       setUploading(false)

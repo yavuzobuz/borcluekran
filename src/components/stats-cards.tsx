@@ -9,6 +9,7 @@ interface Stats {
   totalDebt: number
   thisMonthPromises: number
   overduePromises: number
+  activeDebtors?: number
 }
 
 export function StatsCards() {
@@ -80,7 +81,7 @@ export function StatsCards() {
     },
     {
       title: 'Aktif Takipler',
-      value: (stats as any).activeDebtors?.toLocaleString('tr-TR') || stats.thisMonthPromises.toString(),
+      value: stats.activeDebtors?.toLocaleString('tr-TR') || stats.thisMonthPromises.toString(),
       icon: Calendar,
       color: 'text-orange-600',
       bgColor: 'bg-orange-100'

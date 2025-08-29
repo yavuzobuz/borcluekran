@@ -106,7 +106,7 @@ Write-Host ""
 
 # 1. Docker container'ini baslat
 Write-Host "Docker container baslatiliyor..." -ForegroundColor Blue
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$currentDir'; docker-compose up"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$currentDir'; docker-compose up -d; Write-Host 'Docker container baslatildi! Bu pencereyi kapatabilirsiniz.' -ForegroundColor Green; Read-Host 'Enter ile devam'"
 
 # Uygulamanin baslamasi icin bekle
 Write-Host "Uygulamanin baslamasi icin 10 saniye bekleniyor..." -ForegroundColor Yellow

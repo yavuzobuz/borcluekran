@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { Prisma } from '@prisma/client'
 
 const searchSchema = z.object({
   isim: z.string().optional(),
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
 
     const validatedParams = searchSchema.parse(params);
     
-    const where: any = {};
+    const where: Prisma.BorcluBilgileriWhereInput = {};
     
     if (validatedParams.isim) {
       where.OR = [

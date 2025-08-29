@@ -38,6 +38,12 @@ interface SearchFilters {
   durum: string
 }
 
+interface FileBase64 {
+  data: string | ArrayBuffer | null
+  filename: string
+  type: string
+}
+
 export default function BorcluListesiPage() {
   const [debtors, setDebtors] = useState<Debtor[]>([])
   const [filteredDebtors, setFilteredDebtors] = useState<Debtor[]>([])
@@ -310,15 +316,15 @@ export default function BorcluListesiPage() {
     setIsWhatsAppDialogOpen(true)
   }
 
-  const convertFilesToBase64 = async (files: File[]): Promise<any[]> => {
+  const convertFilesToBase64 = async (files: File[]): Promise<FileBase64[]> => {
     const filePromises = files.map(file => {
-      return new Promise((resolve, reject) => {
+      return new Promise<FileBase64>((resolve, reject) => {
         const reader = new FileReader()
         reader.onload = () => {
           resolve({
             data: reader.result,
             filename: file.name,
-            mimetype: file.type
+            type: file.type
           })
         }
         reader.onerror = reject

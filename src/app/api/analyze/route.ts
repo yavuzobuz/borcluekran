@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       include: {
         odemeSozleri: {
           orderBy: {
-            sozTarihi: 'desc'
+            tarih: 'desc'
           }
         }
       }
@@ -54,14 +54,14 @@ ${borclular.map((borclu, index) => `
 ${index + 1}. Borçlu:
 - Durum Tanıtıcı: ${borclu.durumTanitici}
 - İsim: ${borclu.isim || 'Belirtilmemiş'}
-- Borç Tutarı: ${borclu.borcTutari || 0} TL
+- Borç Tutarı: ${borclu.guncelBorc || 0} TL
 - Telefon: ${borclu.telefon || 'Belirtilmemiş'}
-- Adres: ${borclu.adres || 'Belirtilmemiş'}
-- Notlar: ${borclu.notlar || 'Yok'}
+- Adres: ${borclu.adresBilgileri || 'Belirtilmemiş'}
+- Notlar: ${borclu.neden || 'Yok'}
 - Kayıt Tarihi: ${borclu.kayitTarihi.toLocaleDateString('tr-TR')}
 - Ödeme Sözleri: ${borclu.odemeSozleri.length > 0 ? 
   borclu.odemeSozleri.map(soz => 
-    `\n  * ${soz.sozTarihi.toLocaleDateString('tr-TR')} - ${soz.sozTutari} TL - ${soz.aciklama || 'Açıklama yok'}`
+    `\n  * ${soz.tarih.toLocaleDateString('tr-TR')} - ${soz.odemeMiktari || 0} TL - ${soz.aciklama || 'Açıklama yok'}`
   ).join('') : 'Ödeme sözü yok'
 }
 `).join('\n')}

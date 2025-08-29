@@ -15,6 +15,12 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { WhatsAppMessageTemplates } from '@/components/whatsapp-message-templates'
 
+interface FileBase64 {
+  data: string | ArrayBuffer | null
+  filename: string
+  type: string
+}
+
 interface OdemeSozu {
   id: number
   tarih: string
@@ -213,15 +219,15 @@ export default function BorcluDetayPage() {
     setSelectedFiles(prev => prev.filter((_, i) => i !== index))
   }
 
-  const convertFilesToBase64 = async (files: File[]): Promise<any[]> => {
+  const convertFilesToBase64 = async (files: File[]): Promise<FileBase64[]> => {
     const filePromises = files.map(file => {
-      return new Promise((resolve, reject) => {
+      return new Promise<FileBase64>((resolve, reject) => {
         const reader = new FileReader()
         reader.onload = () => {
           resolve({
             data: reader.result,
             filename: file.name,
-            mimetype: file.type
+            type: file.type
           })
         }
         reader.onerror = reject
@@ -577,7 +583,7 @@ export default function BorcluDetayPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {/* Ödeme Sözü Ekle */}
                 <div
                   onClick={() => setIsDialogOpen(true)}
@@ -608,6 +614,22 @@ export default function BorcluDetayPage() {
                     </div>
                   </div>
                 </Link>
+
+                {/* WhatsApp Mesaj Gönder */}
+                <div
+                  onClick={handleWhatsAppOpen}
+                  className="group cursor-pointer bg-white rounded-xl p-6 border border-gray-100 hover:border-green-200 hover:shadow-md transition-all duration-200 hover:scale-[1.02]"
+                >
+                  <div className="flex flex-col items-center text-center space-y-3">
+                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center group-hover:bg-green-200 transition-colors">
+                      <MessageCircle className="w-6 h-6 text-green-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900 group-hover:text-green-700">WhatsApp</h3>
+                      <p className="text-sm text-gray-500 mt-1">Mesaj gönder</p>
+                    </div>
+                  </div>
+                </div>
 
                 {/* Borçlu Listesi */}
                 <Link href="/borclular">

@@ -20,6 +20,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="tr">
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </head>
       <body className={`${inter.variable} font-sans antialiased`}>
         <div className="min-h-screen bg-background">
           {children}

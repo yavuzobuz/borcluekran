@@ -226,7 +226,7 @@ export function RecentDebtors() {
       </CardHeader>
       <CardContent className="p-4">
         <div className="space-y-3">
-          {debtors.map((debtor, index) => (
+          {debtors.map((debtor) => (
             <div
               key={debtor.durumTanitici}
               className="group relative bg-white border border-slate-200 rounded-lg p-3 hover:shadow-md hover:border-blue-300 transition-all duration-300"
@@ -368,18 +368,4 @@ const getDisplayName = (debtor: Debtor) => {
   }
   
   return cleanName
-}
-
-// Tarih formatlama fonksiyonu
-const formatDateHelper = (dateString: string) => {
-  try {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('tr-TR', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    })
-  } catch {
-    return dateString
-  }
 }

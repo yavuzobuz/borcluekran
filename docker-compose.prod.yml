@@ -6,13 +6,13 @@ services:
       target: runner
     container_name: borclu-sorgulama-prod
     ports:
-      - "3000:3000"
+      - "3002:3000"
     environment:
       - NODE_ENV=production
       - DATABASE_URL=file:/app/prisma/dev.db
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3002}
       - PORT=3000
     volumes:
       # Database persistence

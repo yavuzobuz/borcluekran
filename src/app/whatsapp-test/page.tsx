@@ -5,9 +5,23 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import Image from 'next/image'
+
+interface WhatsAppStatus {
+  isReady?: boolean
+  qrCode?: string
+  error?: string
+  [key: string]: unknown
+}
+
+interface FileData {
+  data: string | ArrayBuffer | null
+  filename: string
+  mimetype: string
+}
 
 export default function WhatsAppTestPage() {
-  const [status, setStatus] = useState<any>(null)
+  const [status, setStatus] = useState<WhatsAppStatus | null>(null)
   const [loading, setLoading] = useState(false)
   const [testMessage, setTestMessage] = useState({
     phoneNumber: '',
@@ -77,9 +91,9 @@ export default function WhatsAppTestPage() {
     }
   }
 
-  const convertFilesToBase64 = async (files: File[]): Promise<any[]> => {
+  const convertFilesToBase64 = async (files: File[]): Promise<FileData[]> => {
     const filePromises = files.map(file => {
-      return new Promise((resolve, reject) => {
+      return new Promise<FileData>((resolve, reject) => {
         const reader = new FileReader()
         reader.onload = () => {
           resolve({
@@ -181,12 +195,13 @@ export default function WhatsAppTestPage() {
               
               {status.qrCode && (
                 <div className="mt-4 text-center">
-                  <p className="mb-2">QR Kodu ile WhatsApp'a bağlanın:</p>
-                  <img 
+                  <p className="mb-2">QR Kodu ile WhatsApp&apos;a bağlanın:</p>
+                  <Image 
                     src={status.qrCode} 
                     alt="WhatsApp QR Code" 
                     className="mx-auto border rounded"
-                    style={{ maxWidth: '300px' }}
+                    width={300}
+                    height={300}
                   />
                 </div>
               )}

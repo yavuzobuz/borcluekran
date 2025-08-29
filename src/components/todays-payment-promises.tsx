@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Eye, Calendar, Clock, TrendingUp } from 'lucide-react'
+import { Eye, Calendar, Clock } from 'lucide-react'
 import Link from 'next/link'
 
 interface PaymentPromise {

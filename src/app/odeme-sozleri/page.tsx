@@ -1,13 +1,13 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Header } from '@/components/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { Calendar, Plus, Search, Clock, CheckCircle, AlertCircle, Filter, X } from 'lucide-react'
+import { Calendar, Plus, Search, Clock, Filter, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { tr } from 'date-fns/locale'
@@ -56,18 +56,7 @@ export default function OdemeSozleriPage() {
   const [odemeMiktari, setOdemeMiktari] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  useEffect(() => {
-    fetchOdemeSozleri()
-    fetchBorclular()
-  }, [])
-
-  useEffect(() => {
-    if (startDate || endDate) {
-      fetchOdemeSozleri()
-    }
-  }, [startDate, endDate])
-
-  const fetchOdemeSozleri = async () => {
+  const fetchOdemeSozleri = useCallback(async () => {
     try {
       const params = new URLSearchParams()
       if (startDate) params.append('startDate', startDate)
@@ -85,7 +74,7 @@ export default function OdemeSozleriPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [startDate, endDate])
 
   const fetchBorclular = async () => {
     try {
@@ -98,6 +87,17 @@ export default function OdemeSozleriPage() {
       console.error('Borçlular yüklenirken hata:', error)
     }
   }
+
+  useEffect(() => {
+    fetchOdemeSozleri()
+    fetchBorclular()
+  }, [fetchOdemeSozleri])
+
+  useEffect(() => {
+    if (startDate || endDate) {
+      fetchOdemeSozleri()
+    }
+  }, [startDate, endDate, fetchOdemeSozleri])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -152,7 +152,7 @@ export default function OdemeSozleriPage() {
     fetchOdemeSozleri()
   }
 
-  const getBorcluName = (borclu: any) => {
+  const getBorcluName = (borclu: OdemeSozu['borclu']) => {
     const fullName = [borclu.ad, borclu.soyad].filter(Boolean).join(' ').trim()
     return borclu.muhatapTanimi || fullName || `Borçlu ${borclu.durumTanitici}`
   }
@@ -174,7 +174,7 @@ export default function OdemeSozleriPage() {
     try {
       const date = new Date(dateString)
       return format(date, 'dd/MM/yyyy', { locale: tr })
-    } catch (error) {
+    } catch {
       return dateString
     }
   }

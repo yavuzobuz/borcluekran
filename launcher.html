@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏢 Borçlu Sorgulama Sistemi - Launcher</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .logo {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 14px;
+        }
+        
+        .button {
+            display: block;
+            width: 100%;
+            padding: 15px 20px;
+            margin: 15px 0;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+        
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        
+        .local-btn {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+        }
+        
+        .internet-btn {
+            background: linear-gradient(45deg, #2196F3, #1976D2);
+        }
+        
+        .clean-btn {
+            background: linear-gradient(45deg, #f44336, #d32f2f);
+        }
+        
+        .stop-btn {
+            background: linear-gradient(45deg, #9E9E9E, #757575);
+        }
+        
+        .status {
+            margin-top: 30px;
+            padding: 15px;
+            border-radius: 10px;
+            background: #f5f5f5;
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .url-box {
+            margin-top: 15px;
+            padding: 10px;
+            background: #e3f2fd;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            word-break: break-all;
+            color: #1976d2;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            font-size: 12px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🏢</div>
+        <div class="title">BORÇLU SORGULAMA SİSTEMİ</div>
+        <div class="subtitle">Modern ve güvenli borçlu takip sistemi</div>
+        
+        <button class="button local-btn" onclick="startLocal()">
+            🏠 YEREL BAŞLAT (WiFi Ağı)
+        </button>
+        
+        <button class="button internet-btn" onclick="startInternet()">
+            🌍 İNTERNET BAŞLAT (Ngrok)
+        </button>
+        
+        <button class="button clean-btn" onclick="cleanDatabase()">
+            🗑️ VERİTABANI TEMİZLE
+        </button>
+        
+        <button class="button stop-btn" onclick="stopSystem()">
+            ⏹️ SİSTEMİ DURDUR
+        </button>
+        
+        <div class="status" id="status">
+            Sistem hazır - Bir işlem seçin
+        </div>
+        
+        <div class="url-box" id="urlBox" style="display: none;">
+            URL burada görünecek...
+        </div>
+        
+        <div class="footer">
+            Docker + Next.js + Ngrok ile güçlendirilmiştir
+        </div>
+    </div>
+
+    <script>
+        function updateStatus(message, color = '#333') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.style.color = color;
+        }
+        
+        function showUrl(url) {
+            const urlBox = document.getElementById('urlBox');
+            urlBox.textContent = url;
+            urlBox.style.display = 'block';
+        }
+        
+        function hideUrl() {
+            document.getElementById('urlBox').style.display = 'none';
+        }
+        
+        function runCommand(command) {
+            // Windows'ta .bat dosyasını çalıştır
+            const projectPath = getProjectPath();
+            const fullCommand = `cd /d "${projectPath}" && ${command}`;
+            
+            // Yeni CMD penceresi aç
+            window.open(`cmd://c/${fullCommand}`, '_blank');
+        }
+        
+        function getProjectPath() {
+            // HTML dosyasının bulunduğu dizin = proje dizini
+            return window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/'));
+        }
+        
+        function startLocal() {
+            updateStatus('🚀 Yerel sistem başlatılıyor...', '#ff9800');
+            hideUrl();
+            
+            // Proje dizinini otomatik tespit et (HTML dosyasının bulunduğu dizin)
+            const currentPath = window.location.pathname;
+            const projectPath = currentPath.substring(1, currentPath.lastIndexOf('/')).replace(/\//g, '\\');
+            
+            // BASIT-LAUNCHER.bat'i seçenek 1 ile çalıştır
+            const batCommand = `cmd /c "cd /d "${projectPath}" && echo 1 | BASIT-LAUNCHER.bat"`;
+            
+            try {
+                // Windows'ta ActiveX kullanarak komut çalıştır
+                const shell = new ActiveXObject("WScript.Shell");
+                shell.Run(batCommand, 1, false);
+                
+                setTimeout(() => {
+                    updateStatus('✅ Yerel sistem çalışıyor!', '#4caf50');
+                    showUrl('🏠 http://localhost:3000 | 📶 http://192.168.0.17:3000');
+                    
+                    // Tarayıcıda localhost'u aç
+                    setTimeout(() => {
+                        window.open('http://localhost:3000', '_blank');
+                    }, 2000);
+                }, 3000);
+            } catch (e) {
+                // ActiveX çalışmazsa alternatif yöntem
+                updateStatus('⚠️ Otomatik başlatma desteklenmiyor. Manuel başlatma...', '#ff9800');
+                
+                // Kullanıcıya talimat ver
+                const instructions = `
+Lütfen şu adımları takip edin:
+1. Dosya Gezgini'ni açın
+2. Bu klasöre gidin: ${projectPath}
+3. BASIT-LAUNCHER.bat dosyasına çift tıklayın
+4. Açılan menüde "1" tuşuna basın
+                `;
+                
+                if (confirm('Otomatik başlatma çalışmadı.\\n\\nManuel başlatma talimatlarını görmek ister misiniz?')) {
+                    alert(instructions);
+                }
+                
+                updateStatus('📋 Manuel başlatma talimatları gösterildi', '#2196f3');
+            }
+        }
+        
+        function startInternet() {
+            updateStatus('🌍 Internet erişimi başlatılıyor...', '#ff9800');
+            hideUrl();
+            
+            // Proje dizinini otomatik tespit et
+            const currentPath = window.location.pathname;
+            const projectPath = currentPath.substring(1, currentPath.lastIndexOf('/')).replace(/\//g, '\\');
+            
+            // BASIT-LAUNCHER.bat'i seçenek 2 ile çalıştır
+            const batCommand = `cmd /c "cd /d "${projectPath}" && echo 2 | BASIT-LAUNCHER.bat"`;
+            
+            try {
+                const shell = new ActiveXObject("WScript.Shell");
+                shell.Run(batCommand, 1, false);
+                
+                setTimeout(() => {
+                    updateStatus('✅ Internet erişimi aktif! Ngrok penceresindeki URL\'i kopyalayın', '#4caf50');
+                    showUrl('🌍 Ngrok penceresindeki https://xxxxx.ngrok.io URL\'ini kopyalayın ve paylaşın');
+                }, 5000);
+            } catch (e) {
+                updateStatus('⚠️ Otomatik başlatma desteklenmiyor. Manuel başlatma...', '#ff9800');
+                
+                const instructions = `
+Lütfen şu adımları takip edin:
+1. Dosya Gezgini'ni açın
+2. Bu klasöre gidin: ${projectPath}
+3. BASIT-LAUNCHER.bat dosyasına çift tıklayın
+4. Açılan menüde "2" tuşuna basın
+5. Ngrok penceresindeki URL'i kopyalayın
+                `;
+                
+                if (confirm('Otomatik başlatma çalışmadı.\\n\\nManuel başlatma talimatlarını görmek ister misiniz?')) {
+                    alert(instructions);
+                }
+                
+                updateStatus('📋 Manuel başlatma talimatları gösterildi', '#2196f3');
+            }
+        }
+        
+        function cleanDatabase() {
+            if (confirm('TÜM veritabanı verileri silinecek!\\nBu işlem geri alınamaz.\\n\\nDevam etmek istiyor musunuz?')) {
+                updateStatus('🗑️ Veritabanı temizleniyor...', '#ff9800');
+                hideUrl();
+                
+                const projectPath = 'C:\\Users\\Obuzhukuk\\Desktop\\BORCLUSORGU\\borclu-sorgulama';
+                const psCommand = `powershell -Command "Set-Location '${projectPath}'; Start-Process cmd -ArgumentList '/k', 'docker-compose down && docker volume rm borclu-sorgulama_borclu-db-data 2>nul && docker-compose up -d && echo Veritabani temizlendi! && pause'"`;
+                
+                try {
+                    const shell = new ActiveXObject("WScript.Shell");
+                    shell.Run(psCommand, 1, false);
+                    
+                    setTimeout(() => {
+                        updateStatus('✅ Veritabanı temizlendi ve sistem yeniden başlatıldı!', '#4caf50');
+                    }, 8000);
+                } catch (e) {
+                    updateStatus('❌ Temizlenemedi! Manuel olarak VERITABANI-TEMIZLE.bat çalıştırın', '#f44336');
+                }
+            }
+        }
+        
+        function stopSystem() {
+            updateStatus('⏹️ Sistem durduruluyor...', '#ff9800');
+            hideUrl();
+            
+            // Proje dizinini otomatik tespit et
+            const currentPath = window.location.pathname;
+            const projectPath = currentPath.substring(1, currentPath.lastIndexOf('/')).replace(/\//g, '\\');
+            
+            // BASIT-LAUNCHER.bat'i seçenek 3 ile çalıştır
+            const batCommand = `cmd /c "cd /d "${projectPath}" && echo 3 | BASIT-LAUNCHER.bat"`;
+            
+            try {
+                const shell = new ActiveXObject("WScript.Shell");
+                shell.Run(batCommand, 1, false);
+                
+                setTimeout(() => {
+                    updateStatus('⏹️ Sistem durduruldu', '#757575');
+                }, 3000);
+            } catch (e) {
+                updateStatus('⚠️ Otomatik durdurma desteklenmiyor. Manuel durdurma...', '#ff9800');
+                
+                const instructions = `
+Lütfen şu adımları takip edin:
+1. Dosya Gezgini'ni açın
+2. Bu klasöre gidin: ${projectPath}
+3. BASIT-LAUNCHER.bat dosyasına çift tıklayın
+4. Açılan menüde "3" tuşuna basın
+                `;
+                
+                if (confirm('Otomatik durdurma çalışmadı.\\n\\nManuel durdurma talimatlarını görmek ister misiniz?')) {
+                    alert(instructions);
+                }
+                
+                updateStatus('📋 Manuel durdurma talimatları gösterildi', '#2196f3');
+            }
+        }
+        
+        // Sayfa yüklendiğinde
+        window.onload = function() {
+            updateStatus('Sistem hazır - Bir işlem seçin', '#4caf50');
+        }
+    </script>
+</body>
+</html>

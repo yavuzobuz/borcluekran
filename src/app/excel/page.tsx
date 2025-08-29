@@ -18,19 +18,46 @@ interface UploadResult {
   errors?: string[]
 }
 
+interface AnalysisResult {
+  success: boolean
+  message: string
+  totalRecords?: number
+  issues?: Array<{
+    id: number
+    issue: string
+    suggestion: string
+  }>
+  problemRecords?: Array<{
+    id: number
+    issue: string
+    data: Record<string, unknown>
+  }>
+}
+
 interface CleanupResult {
   success: boolean
   message: string
   totalRecords?: number
   fixedRecords?: number
-  details?: any[]
+  details?: Array<{
+    id: number
+    before: string
+    after: string
+  }>
+}
+
+interface ClearResult {
+  success: boolean
+  message: string
+  deletedCount?: number
+  previousCount?: number
 }
 
 // Veri Temizleme Bileşeni
 function DataCleanupCard() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isFixing, setIsFixing] = useState(false)
-  const [analysisResult, setAnalysisResult] = useState<any>(null)
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
   const [cleanupResult, setCleanupResult] = useState<CleanupResult | null>(null)
 
   const handleAnalyze = async () => {
@@ -43,7 +70,7 @@ function DataCleanupCard() {
       if (response.ok) {
         const result = await response.json()
         setAnalysisResult(result)
-        toast.success(`Analiz tamamlandı: ${result.problemRecords} problemli kayıt bulundu`)
+        toast.success(`Analiz tamamlandı: ${result.problemRecords?.length || 0} problemli kayıt bulundu`)
       } else {
         const error = await response.json()
         toast.error(error.error || 'Analiz sırasında hata oluştu')
@@ -157,10 +184,10 @@ function DataCleanupCard() {
               <h4 className="font-semibold text-blue-900 mb-2">Analiz Sonuçları</h4>
               <div className="text-sm text-blue-700 space-y-1">
                 <p>Toplam kayıt: {analysisResult.totalRecords}</p>
-                <p>Problemli kayıt: {analysisResult.problemRecords}</p>
-                {analysisResult.problemRecords > 0 && (
+                <p>Problemli kayıt: {analysisResult.problemRecords?.length || 0}</p>
+                {(analysisResult.problemRecords?.length || 0) > 0 && (
                   <p className="text-orange-600">
-                    ⚠️ {analysisResult.problemRecords} kayıtta muhatap tanımı sorunu bulundu
+                    ⚠️ {analysisResult.problemRecords?.length || 0} kayıtta muhatap tanımı sorunu bulundu
                   </p>
                 )}
               </div>
@@ -205,7 +232,7 @@ function DataCleanupCard() {
             <ul className="mt-1 space-y-1 ml-2">
               <li>• Adres bilgilerini muhatap tanımından temizler</li>
               <li>• TC kimlik numaralarını isim alanından çıkarır</li>
-              <li>• "Borçlu" kelimelerini temizler</li>
+              <li>• &quot;Borçlu&quot; kelimelerini temizler</li>
               <li>• Ad/soyad bilgilerini düzenler</li>
             </ul>
           </div>
@@ -229,7 +256,7 @@ function DataCleanupCard() {
 function DatabaseClearCard() {
   const [isClearing, setIsClearing] = useState(false)
   const [recordCount, setRecordCount] = useState<number | null>(null)
-  const [clearResult, setClearResult] = useState<any>(null)
+  const [clearResult, setClearResult] = useState<ClearResult | null>(null)
 
   const fetchRecordCount = async () => {
     try {
