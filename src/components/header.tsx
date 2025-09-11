@@ -1,14 +1,16 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
-import { FileSpreadsheet, Search, Users, BarChart3, Calendar, Menu, X } from 'lucide-react'
+import { FileSpreadsheet, Search, Users, BarChart3, Calendar, Menu, X, LogIn, LogOut } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
+import { useAuth } from '@/lib/auth/AuthProvider'
 
 export function Header() {
   const pathname = usePathname()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const { user, signOut } = useAuth()
 
   const navigation = [
     { name: 'Ana Sayfa', href: '/', icon: Search },
@@ -61,10 +63,37 @@ export function Header() {
           </div>
 
           <div className="flex items-center space-x-4">
-            {/* Desktop Settings Button */}
-            <Button variant="outline" size="sm" className="hidden md:flex">
-              Ayarlar
-            </Button>
+            {/* Auth Buttons */}
+            {user ? (
+              <div className="hidden md:flex items-center space-x-3">
+                <span className="text-sm text-gray-600">
+                  {user.email}
+                </span>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => signOut()}
+                  className="flex items-center space-x-2"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Çıkış</span>
+                </Button>
+              </div>
+            ) : (
+              <div className="hidden md:flex items-center space-x-2">
+                <Link href="/auth/login">
+                  <Button variant="outline" size="sm" className="flex items-center space-x-2">
+                    <LogIn className="w-4 h-4" />
+                    <span>Giriş</span>
+                  </Button>
+                </Link>
+                <Link href="/auth/register">
+                  <Button size="sm" className="flex items-center space-x-2">
+                    <span>Kayıt Ol</span>
+                  </Button>
+                </Link>
+              </div>
+            )}
 
             {/* Mobile Menu Button */}
             <button
@@ -106,11 +135,38 @@ export function Header() {
                 )
               })}
               
-              {/* Mobile Settings */}
+              {/* Mobile Auth */}
               <div className="px-4 py-3 border-t border-gray-200 mt-2">
-                <Button variant="outline" size="sm" className="w-full">
-                  Ayarlar
-                </Button>
+                {user ? (
+                  <div className="space-y-2">
+                    <div className="text-sm text-gray-600 mb-3">
+                      {user.email}
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => signOut()}
+                      className="w-full flex items-center justify-center space-x-2"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>Çıkış</span>
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Link href="/auth/login" className="block">
+                      <Button variant="outline" size="sm" className="w-full flex items-center justify-center space-x-2">
+                        <LogIn className="w-4 h-4" />
+                        <span>Giriş</span>
+                      </Button>
+                    </Link>
+                    <Link href="/auth/register" className="block">
+                      <Button size="sm" className="w-full">
+                        Kayıt Ol
+                      </Button>
+                    </Link>
+                  </div>
+                )}
               </div>
             </nav>
           </div>

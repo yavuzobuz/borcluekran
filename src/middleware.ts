@@ -43,6 +43,11 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/auth/login', request.url))
     }
 
+    // Authenticated users accessing root should go to dashboard
+    if (request.nextUrl.pathname === '/' && user) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+
     // Already authenticated users shouldn't access auth pages
     const authRoutes = ['/auth/login', '/auth/register', '/auth/forgot-password']
     const isAuthRoute = authRoutes.includes(request.nextUrl.pathname)
