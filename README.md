@@ -78,6 +78,38 @@ NEXTAUTH_SECRET="buraya_guclu_bir_sifre_yazin"
 Tarayıcıda: http://localhost:3000
 ```
 
+### 🌍 Ngrok ile Dışarıdan Erişim
+
+Sisteminizi internet üzerinden erişilebilir hale getirmek için:
+
+#### 📱 Yöntem 1: Batch Script ile (Kolay)
+```
+🖱️ start-with-ngrok.bat dosyasına çift tıklayın
+```
+
+#### ⚙️ Yöntem 2: Manuel Konfigürasyon
+
+1. **Ngrok hesabı oluşturun:** https://ngrok.com/
+2. **Auth token alın:** https://dashboard.ngrok.com/get-started/your-authtoken
+3. **Ayar dosyasını düzenleyin:**
+   ```env
+   # .env dosyasına ekleyin
+   ENABLE_NGROK=true
+   NGROK_AUTHTOKEN=your_actual_token_here
+   ```
+4. **Ngrok ile başlatın:**
+   ```
+   npm run start:ngrok
+   ```
+
+#### 🔗 Public URL ile Erişim
+Ngrok çalıştıktan sonra size verilen public URL'i kullanarak:
+- Mobil cihazlardan
+- Farklı ağlardan  
+- İnternet üzerindeki herhangi bir yerden
+
+Sisteminize erişebilirsiniz!
+
 ---
 
 ## 🆘 Sorun Giderme

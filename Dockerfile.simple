@@ -1,0 +1,22 @@
+# Simple Dockerfile for Next.js
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies offline
+RUN npm ci --only=production --no-audit --no-fund || npm install --production
+
+# Copy application files
+COPY . .
+
+# Build the application
+RUN npm run build || echo "Build skipped"
+
+# Expose port
+EXPOSE 3000
+
+# Start the application
+CMD ["npm", "start"]

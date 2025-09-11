@@ -4,6 +4,7 @@ const next = require('next');
 const express = require('express');
 const path = require('path');
 const compression = require('compression');
+const ngrok = require('ngrok');
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || 'localhost';
@@ -111,23 +112,54 @@ app.prepare().then(() => {
   // Start the server
   const httpServer = createServer(server);
 
-  httpServer.listen(port, (err) => {
+  httpServer.listen(port, async (err) => {
     if (err) throw err;
     console.log(`> Ready on http://${hostname}:${port}`);
+    
+    // Start Ngrok tunnel if enabled
+    if (process.env.ENABLE_NGROK === 'true') {
+      try {
+        console.log('Starting Ngrok tunnel...');
+        const url = await ngrok.connect({
+          addr: port,
+          authtoken: process.env.NGROK_AUTHTOKEN, // Optional: set your ngrok auth token
+          region: 'eu' // Optional: set your preferred region
+        });
+        console.log(`\n🌍 Ngrok tunnel created:`);
+        console.log(`🔗 Public URL: ${url}`);
+        console.log(`🏠 Local URL:  http://${hostname}:${port}`);
+        console.log(`\n📱 You can now access your app from anywhere using the public URL!\n`);
+      } catch (error) {
+        console.error('Failed to create Ngrok tunnel:', error.message);
+        console.log('Continuing without Ngrok tunnel...');
+      }
+    }
   });
 
   // Graceful shutdown
   process.on('SIGTERM', () => {
     console.log('SIGTERM received, shutting down gracefully');
-    httpServer.close(() => {
-      console.log('Process terminated');
+    ngrok.disconnect().then(() => {
+      httpServer.close(() => {
+        console.log('Process terminated');
+      });
+    }).catch(() => {
+      httpServer.close(() => {
+        console.log('Process terminated');
+      });
     });
   });
 
   process.on('SIGINT', () => {
     console.log('SIGINT received, shutting down gracefully');
-    httpServer.close(() => {
-      console.log('Process terminated');
+    ngrok.disconnect().then(() => {
+      httpServer.close(() => {
+        console.log('Process terminated');
+      });
+    }).catch(() => {
+      httpServer.close(() => {
+        console.log('Process terminated');
+      });
     });
   });
 });

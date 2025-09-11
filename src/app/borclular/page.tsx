@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Search, FileText, Calendar, TrendingUp, Upload, FileImage, FileIcon, X } from 'lucide-react'
+import { Search, FileText, Calendar, TrendingUp, Upload, FileImage, FileIcon, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import { Header } from '@/components/header'
 import { WhatsAppMessageTemplates } from '@/components/whatsapp-message-templates'
@@ -81,6 +81,10 @@ function BorclularContent() {
   const [filteredBorclular, setFilteredBorclular] = useState<Borclu[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(100)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
   const [stats, setStats] = useState({
     toplam: 0,
     aktif: 0,
@@ -240,6 +244,22 @@ function BorclularContent() {
     }).format(amount)
   }
 
+  // Sayfa navigasyon fonksiyonları
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page)
+      // URL'i güncelle
+      const currentUrl = new URL(window.location.href)
+      currentUrl.searchParams.set('page', page.toString())
+      window.history.pushState({}, '', currentUrl.toString())
+    }
+  }
+
+  const goToFirstPage = () => handlePageChange(1)
+  const goToPreviousPage = () => handlePageChange(currentPage - 1)
+  const goToNextPage = () => handlePageChange(currentPage + 1)
+  const goToLastPage = () => handlePageChange(totalPages)
+
   // URL parametrelerini oku
   const urlParams = {
     name: searchParams.get('name') || '',
@@ -248,7 +268,8 @@ function BorclularContent() {
     telefon: searchParams.get('telefon') || '',
     tcKimlik: searchParams.get('tcKimlik') || '',
     minBorc: searchParams.get('minBorc') || '',
-    maxBorc: searchParams.get('maxBorc') || ''
+    maxBorc: searchParams.get('maxBorc') || '',
+    page: parseInt(searchParams.get('page') || '1')
   }
 
   // Adres bilgilerini kontrol eden fonksiyon
@@ -382,41 +403,59 @@ function BorclularContent() {
   }
 
   useEffect(() => {
-    fetchBorclular()
-  }, [urlParams.name, urlParams.durumTanitici, urlParams.sozlesmeHesabi, urlParams.minBorc, urlParams.maxBorc, urlParams.telefon, urlParams.tcKimlik])
+    setCurrentPage(urlParams.page)
+  }, [urlParams.page])
 
   useEffect(() => {
-    const filtered = borclular.filter(borclu =>
-      (borclu.muhatapTanimi?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
-      (borclu.ad?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
-      (borclu.soyad?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
-      (borclu.tcKimlikNo?.includes(searchTerm) || false) ||
-      (borclu.tcKimlik?.includes(searchTerm) || false) ||
-      (borclu.ilgiliTCKN?.includes(searchTerm) || false) ||
-      borclu.durumTanitici.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (borclu.icraDosyaNumarasi?.includes(searchTerm) || false)
-    )
-    setFilteredBorclular(filtered)
+    fetchBorclular()
+  }, [urlParams.name, urlParams.durumTanitici, urlParams.sozlesmeHesabi, urlParams.minBorc, urlParams.maxBorc, urlParams.telefon, urlParams.tcKimlik, currentPage])
+
+  useEffect(() => {
+    // Artık backend sayfalama kullandığımız için local filtreleme yapmıyoruz
+    // Sadece mevcut sayfadaki borçlularda searchTerm ile filtreleme yapıyoruz
+    if (searchTerm.trim() === '') {
+      setFilteredBorclular(borclular)
+    } else {
+      const filtered = borclular.filter(borclu =>
+        (borclu.muhatapTanimi?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+        (borclu.ad?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+        (borclu.soyad?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+        (borclu.tcKimlikNo?.includes(searchTerm) || false) ||
+        (borclu.tcKimlik?.includes(searchTerm) || false) ||
+        (borclu.ilgiliTCKN?.includes(searchTerm) || false) ||
+        borclu.durumTanitici.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (borclu.icraDosyaNumarasi?.includes(searchTerm) || false)
+      )
+      setFilteredBorclular(filtered)
+    }
   }, [searchTerm, borclular])
 
   const fetchBorclular = async () => {
     try {
       // Önce stats API'den gerçek istatistikleri al
-      const statsResponse = await fetch('/api/stats')
-      if (statsResponse.ok) {
-        const statsData = await statsResponse.json()
-        setStats({
-          toplam: statsData.totalDebtors,
-          aktif: statsData.activeDebtors,
-          odenen: statsData.paidDebtors,
-          geciken: statsData.problematicDebtors,
-          toplamBorc: statsData.totalDebt
-        })
+      try {
+        const statsResponse = await fetch('/api/stats')
+        if (statsResponse.ok) {
+          const statsData = await statsResponse.json()
+          setStats({
+            toplam: statsData.totalDebtors || 0,
+            aktif: statsData.activeDebtors || 0,
+            odenen: statsData.paidDebtors || 0,
+            geciken: statsData.problematicDebtors || 0,
+            toplamBorc: statsData.totalDebt || 0
+          })
+        } else {
+          console.error('Stats API failed:', await statsResponse.text())
+        }
+      } catch (error) {
+        console.error('Stats API error:', error)
+        // İstatistikler yüklenemezse varsayılan değerler kalsın
       }
 
-      // URL parametrelerini API çağrısında kullan - tüm kayıtları getir
+      // URL parametrelerini API çağrısında kullan - sayfalama ile
       const queryParams = new URLSearchParams({
-        limit: '10000'
+        limit: itemsPerPage.toString(),
+        page: currentPage.toString()
       })
 
       if (urlParams.name) {
@@ -482,6 +521,17 @@ function BorclularContent() {
         console.log('Processed list:', list)
         console.log('Ödeme sözü olan borçlular:', list.filter(b => b.hasActivePaymentPromise))
         setBorclular(list)
+        
+        // Sayfalama bilgilerini güncelle
+        if (data.pagination) {
+          console.log('Pagination data:', data.pagination)
+          setTotalItems(data.pagination.total)
+          setTotalPages(data.pagination.totalPages)
+          console.log('Total pages set to:', data.pagination.totalPages)
+        } else {
+          console.log('No pagination data received')
+        }
+        
         // İstatistikler zaten stats API'den alındı, tekrar hesaplama
       }
     } catch (error) {
@@ -895,6 +945,120 @@ function BorclularContent() {
             })
           )}
         </div>
+
+        {/* Sayfalama Kontrollers */}
+        <div className="mt-4 p-4 bg-yellow-50 border rounded text-sm">
+          <strong>Debug:</strong> totalPages: {totalPages}, currentPage: {currentPage}, totalItems: {totalItems}
+        </div>
+        {(
+          <div className="mt-8 flex flex-col items-center space-y-4">
+            {/* Sayfa Bilgisi */}
+            <div className="text-sm text-gray-600">
+              <span className="font-medium">
+                {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, totalItems)}
+              </span>
+              <span className="mx-2">arası, toplam</span>
+              <span className="font-medium">{totalItems}</span>
+              <span className="mx-1">kayıt</span>
+            </div>
+            
+            {/* Sayfa Navigasyonu */}
+            <div className="flex items-center space-x-2">
+              {/* İlk Sayfa */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToFirstPage}
+                disabled={currentPage === 1}
+                className="text-xs"
+              >
+                İlk
+              </Button>
+              
+              {/* Önceki Sayfa */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToPreviousPage}
+                disabled={currentPage === 1}
+                className="text-xs"
+              >
+                <ChevronLeft className="h-3 w-3" />
+                Önceki
+              </Button>
+              
+              {/* Sayfa Numaraları */}
+              <div className="flex space-x-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={currentPage === pageNum ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handlePageChange(pageNum)}
+                      className="text-xs min-w-[32px]"
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+              </div>
+              
+              {/* Sonraki Sayfa */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToNextPage}
+                disabled={currentPage === totalPages}
+                className="text-xs"
+              >
+                Sonraki
+                <ChevronRight className="h-3 w-3" />
+              </Button>
+              
+              {/* Son Sayfa */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToLastPage}
+                disabled={currentPage === totalPages}
+                className="text-xs"
+              >
+                Son
+              </Button>
+            </div>
+            
+            {/* Hızlı Sayfa Atlama */}
+            <div className="flex items-center space-x-2 text-sm">
+              <span>Sayfaya git:</span>
+              <Input
+                type="number"
+                min="1"
+                max={totalPages}
+                value={currentPage}
+                onChange={(e) => {
+                  const page = parseInt(e.target.value)
+                  if (page >= 1 && page <= totalPages) {
+                    handlePageChange(page)
+                  }
+                }}
+                className="w-16 h-8 text-center text-xs"
+              />
+              <span>/ {totalPages}</span>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   )

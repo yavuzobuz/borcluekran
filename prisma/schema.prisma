@@ -57,6 +57,18 @@ model BorcluBilgileri {
   // İlişkiler
   odemeSozleri         OdemeSozu[] @relation("BorcluOdemeSozleri")
 
+  // Performance Indexes
+  @@index([durumTanitici])
+  @@index([sozlesmeHesabi])
+  @@index([tcKimlikNo])
+  @@index([telefon])
+  @@index([guncelBorc])
+  @@index([durumTanimi])
+  @@index([kayitTarihi])
+  @@index([ad, soyad])
+  @@index([isim])
+  @@index([muhatapTanimi])
+  @@index([icraDosyaNumarasi])
   @@map("borclu_bilgileri")
 }
 
@@ -73,6 +85,11 @@ model OdemeSozu {
   // İlişkiler
   borclu           BorcluBilgileri  @relation("BorcluOdemeSozleri", fields: [borcluId], references: [id], onDelete: Cascade)
 
+  // Performance Indexes
+  @@index([borcluId])
+  @@index([tarih])
+  @@index([durum])
+  @@index([borcluId, durum])
   @@map("odeme_sozleri")
 }
 
@@ -95,4 +112,22 @@ model WhatsAppMessage {
   @@index([status])
   @@index([createdAt])
   @@map("whatsapp_messages")
+}
+
+model UserProfile {
+  id              Int       @id @default(autoincrement())
+  supabaseUserId  String    @unique @map("supabase_user_id")
+  email           String    @unique
+  fullName        String?   @map("full_name")
+  role            String    @default("user") // admin, user
+  isActive        Boolean   @default(true) @map("is_active")
+  lastLogin       DateTime? @map("last_login")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Performance Indexes
+  @@index([supabaseUserId])
+  @@index([email])
+  @@index([role])
+  @@map("user_profiles")
 }

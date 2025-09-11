@@ -7,7 +7,7 @@ cd /d "%~dp0"
 
 REM Iki terminal penceresi ac
 echo Next.js uygulamasi baslatiliyor...
-start "Next.js App" cmd /k "npm run dev"
+start "Next.js App" cmd /k "npm run start"
 
 REM 10 saniye bekle (uygulamanin baslamasi icin)
 echo Uygulama baslatiliyor, lutfen bekleyin...

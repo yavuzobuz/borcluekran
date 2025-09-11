@@ -120,7 +120,22 @@ export async function GET(request: NextRequest) {
         orderBy: {
           kayitTarihi: 'desc'
         },
-        include: {
+        select: {
+          id: true,
+          durumTanitici: true,
+          muhatapTanimi: true,
+          muhatapTanimiEk: true,
+          durumTanimi: true,
+          sozlesmeHesabi: true,
+          tcKimlikNo: true,
+          ad: true,
+          soyad: true,
+          isim: true,
+          telefon: true,
+          guncelBorc: true,
+          il: true,
+          icraDosyaNumarasi: true,
+          kayitTarihi: true,
           _count: {
             select: {
               odemeSozleri: {

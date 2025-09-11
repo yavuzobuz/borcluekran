@@ -72,12 +72,13 @@ RUN chown -R nextjs:nodejs /app/.next /app/public /app/_next /app/server.js
 RUN chmod -R 755 /app/.next/static /app/public /app/_next/static
 
 # Copy Prisma files
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
 # Generate Prisma client and setup database
 RUN npx prisma generate
-RUN npx prisma db push --accept-data-loss || true
+# Database will be initialized on first run via volumes
 
 # Create necessary directories with proper permissions
 RUN mkdir -p /app/.wwebjs_auth /app/.wwebjs_cache /app/temp /app/prisma

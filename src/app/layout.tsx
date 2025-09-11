@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { Toaster } from "@/components/ui/sonner"
+import { AuthProvider } from "@/lib/auth/AuthProvider"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -24,10 +25,12 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body className={`${inter.variable} font-sans antialiased`}>
-        <div className="min-h-screen bg-background">
-          {children}
-        </div>
-        <Toaster />
+        <AuthProvider>
+          <div className="min-h-screen bg-background">
+            {children}
+          </div>
+          <Toaster />
+        </AuthProvider>
       </body>
     </html>
   )
